@@ -1,0 +1,113 @@
+-- RoofU LMS — Supabase Schema
+-- Run this entire file in your Supabase SQL Editor to create all tables.
+
+create extension if not exists "uuid-ossp";
+
+-- Programs
+create table programs (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  description text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Courses
+create table courses (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  description text,
+  product text not null default 'SalesRabbit',
+  quiz_id uuid,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Program ↔ Course join (ordered)
+create table program_courses (
+  id uuid primary key default uuid_generate_v4(),
+  program_id uuid references programs(id) on delete cascade,
+  course_id uuid references courses(id) on delete cascade,
+  "order" integer default 0
+);
+
+-- Sections
+create table sections (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  course_id uuid references courses(id) on delete cascade,
+  quiz_id uuid,
+  "order" integer default 0
+);
+
+-- Lessons
+create table lessons (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  section_id uuid references sections(id) on delete cascade,
+  video_type text check (video_type in ('youtube', 'mp4')) default 'youtube',
+  video_url text,
+  written_content text,
+  quiz_id uuid,
+  "order" integer default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Quizzes
+create table quizzes (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  attached_to_id uuid,
+  attached_to_type text check (attached_to_type in ('lesson', 'section', 'course')),
+  pass_threshold integer default 80
+);
+
+-- Quiz Questions
+create table quiz_questions (
+  id uuid primary key default uuid_generate_v4(),
+  quiz_id uuid references quizzes(id) on delete cascade,
+  question_text text not null,
+  options jsonb not null default '[]',
+  correct_option_index integer not null default 0,
+  "order" integer default 0
+);
+
+-- Users
+create table users (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text unique not null,
+  role text check (role in ('admin', 'learner')) default 'learner',
+  created_at timestamptz default now()
+);
+
+-- User ↔ Program enrollments
+create table user_program_enrollments (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references users(id) on delete cascade,
+  program_id uuid references programs(id) on delete cascade,
+  enrolled_at timestamptz default now()
+);
+
+-- Learner progress per course
+create table progress (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references users(id) on delete cascade,
+  course_id uuid references courses(id) on delete cascade,
+  completed_lesson_ids jsonb default '[]',
+  completed_section_ids jsonb default '[]',
+  course_completed boolean default false,
+  last_updated timestamptz default now(),
+  unique(user_id, course_id)
+);
+
+-- Quiz results
+create table quiz_results (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references users(id) on delete cascade,
+  quiz_id uuid references quizzes(id) on delete cascade,
+  score integer,
+  passed boolean,
+  completed_at timestamptz default now()
+);
