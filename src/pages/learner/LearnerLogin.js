@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { supabase } from '../../supabase/client';
 
 export default function LearnerLogin({ onLogin }) {
-  const [tab, setTab] = useState('signin'); // 'signin' | 'signup' | 'reset'
+  const defaultTab = new URLSearchParams(window.location.search).get('signup') === '1' ? 'signup' : 'signin';
+  const [tab, setTab] = useState(defaultTab); // 'signin' | 'signup' | 'reset'
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

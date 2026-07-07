@@ -62,7 +62,7 @@ export default function UserManager() {
           template_params: {
             to_name: name,
             to_email: email,
-            login_url: window.location.origin,
+            login_url: `${window.location.origin}/?signup=1`,
             message: `You've been added to RoofU. Create your account at the link below using this email address: ${email}`,
           },
         }),
