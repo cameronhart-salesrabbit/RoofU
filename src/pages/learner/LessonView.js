@@ -20,7 +20,7 @@ export default function LessonView() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
   const [lesson, setLesson] = useState(null);
-  const [section, setSection] = useState(null);
+
   const [course, setCourse] = useState(null);
   const [allLessons, setAllLessons] = useState([]); // flat ordered list for prev/next
   const [courseSections, setCourseSections] = useState([]); // sections with their lessons for sidebar
@@ -48,7 +48,6 @@ export default function LessonView() {
 
     // Load section + course for breadcrumbs and prev/next
     const { data: sec } = await supabase.from('sections').select('*').eq('id', l.section_id).single();
-    setSection(sec);
 
     if (sec) {
       const { data: c } = await supabase.from('courses').select('*').eq('id', sec.course_id).single();
@@ -95,7 +94,7 @@ export default function LessonView() {
     }
 
     setLoading(false);
-  }, [fetchProgress]);
+  }, [fetchProgress, learnerId]);
 
   useEffect(() => { loadLesson(lessonId); }, [lessonId, loadLesson]);
 

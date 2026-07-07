@@ -15,7 +15,7 @@ export default function UserManager() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [detailUser, setDetailUser] = useState(null);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchAll() {
     setLoading(true);

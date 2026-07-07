@@ -6,7 +6,7 @@ import { useProgress } from '../../context/ProgressContext';
 export default function MyPrograms() {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { fetchProgress, getCourseProgress } = useProgress();
+  const { fetchProgress } = useProgress();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const search = searchParams.get('q') || '';
