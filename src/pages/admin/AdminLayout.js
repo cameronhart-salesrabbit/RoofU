@@ -46,6 +46,13 @@ export default function AdminLayout() {
           ))}
         </nav>
         <button
+          onClick={() => navigate('/')}
+          style={{ ...styles.logoutBtn, marginBottom: 8, color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }}
+        >
+          <i className="fa-solid fa-graduation-cap" style={{ marginRight: 8, fontSize: 12 }} />
+          Learner View
+        </button>
+        <button
           onClick={() => { logout(); navigate('/admin/login'); }}
           style={styles.logoutBtn}
         >

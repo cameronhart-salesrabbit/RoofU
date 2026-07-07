@@ -78,6 +78,12 @@ export default function LearnerLayout() {
         )}
         <div style={styles.userArea}>
           <span style={styles.userName}>{user.name}</span>
+          {user.role === 'admin' && (
+            <button onClick={() => navigate('/admin')} style={styles.adminSwitchBtn}>
+              <i className="fa-solid fa-shield-halved" style={{ marginRight: 6, fontSize: 11 }} />
+              Admin Portal
+            </button>
+          )}
           <button onClick={handleLogout} style={styles.logoutBtn}>Sign Out</button>
         </div>
       </header>
@@ -111,6 +117,7 @@ const styles = {
   searchInput: { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px 6px 28px', fontSize: 13, color: 'rgba(255,255,255,0.8)', outline: 'none', width: 200 },
   userArea: { display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' },
   userName: { fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.65)' },
+  adminSwitchBtn: { background: 'rgba(244,97,0,0.15)', border: '1px solid rgba(244,97,0,0.3)', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#F46100', cursor: 'pointer', fontWeight: 600 },
   logoutBtn: { background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' },
   main: { flex: 1, padding: '32px', maxWidth: 1000, margin: '0 auto', width: '100%' },
   mainFull: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
