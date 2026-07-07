@@ -15,8 +15,14 @@ export default function LearnerLayout() {
   useEffect(() => {
     async function loadProfile(authUserId) {
       if (!authUserId) { setUser(null); setAuthLoading(false); return; }
-      const { data } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
-      setUser(data || null);
+      try {
+        const { data, error } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
+        if (error && error.code !== 'PGRST116') console.error('Profile load error:', error);
+        setUser(data || null);
+      } catch (e) {
+        console.error('Profile load exception:', e);
+        setUser(null);
+      }
       setAuthLoading(false);
     }
 
