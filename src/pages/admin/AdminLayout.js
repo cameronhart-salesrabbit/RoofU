@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
@@ -15,10 +15,11 @@ export default function AdminLayout() {
   const { isAdmin, logout } = useAdminAuth();
   const navigate = useNavigate();
 
-  if (!isAdmin) {
-    navigate('/admin/login');
-    return null;
-  }
+  useEffect(() => {
+    if (!isAdmin) navigate('/admin/login');
+  }, [isAdmin, navigate]);
+
+  if (!isAdmin) return null;
 
   return (
     <div style={styles.shell} className="admin-shell">
