@@ -46,15 +46,41 @@ export default function UserManager() {
     setShowForm(true);
   }
 
+  async function sendWelcomeEmail(name, email) {
+    const serviceId = process.env.REACT_APP_EMAILJS_SERVICE_ID;
+    const templateId = process.env.REACT_APP_EMAILJS_WELCOME_TEMPLATE_ID || process.env.REACT_APP_EMAILJS_TEMPLATE_ID;
+    const publicKey = process.env.REACT_APP_EMAILJS_PUBLIC_KEY;
+    if (!serviceId || !templateId || !publicKey) return;
+    try {
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: serviceId,
+          template_id: templateId,
+          user_id: publicKey,
+          template_params: {
+            to_name: name,
+            to_email: email,
+            login_url: window.location.origin,
+            message: `You've been added to RoofU. Create your account at the link below using this email address: ${email}`,
+          },
+        }),
+      });
+    } catch (err) { /* non-blocking */ }
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     setSaving(true);
     let userId = editing?.id;
+    let isNew = false;
     if (editing) {
       await supabase.from('users').update({ name: form.name, email: form.email, role: form.role }).eq('id', editing.id);
     } else {
       const { data } = await supabase.from('users').insert({ name: form.name, email: form.email, role: form.role }).select().single();
       userId = data?.id;
+      isNew = true;
     }
     if (userId) {
       await supabase.from('user_program_enrollments').delete().eq('user_id', userId);
@@ -64,6 +90,7 @@ export default function UserManager() {
         );
       }
     }
+    if (isNew) await sendWelcomeEmail(form.name, form.email);
     setSaving(false);
     setShowForm(false);
     fetchAll();
@@ -229,7 +256,7 @@ export default function UserManager() {
                 <thead>
                   <tr>
                     <th style={styles.th}><input type="checkbox" checked={selectedUserIds.length === users.length && users.length > 0} onChange={toggleSelectAll} /></th>
-                    {['Name', 'Email', 'Role', 'Enrolled In', ''].map(h => (
+                    {['Name', 'Email', 'Role', 'Status', 'Enrolled In', ''].map(h => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
                   </tr>
@@ -250,6 +277,12 @@ export default function UserManager() {
                         <td style={styles.td}>{user.email}</td>
                         <td style={styles.td}>
                           <span className={`badge ${user.role === 'admin' ? 'badge-red' : 'badge-gray'}`}>{user.role}</span>
+                        </td>
+                        <td style={styles.td}>
+                          {user.auth_id
+                            ? <span className="badge badge-green"><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }} />Active</span>
+                            : <span className="badge badge-gray"><i className="fa-solid fa-clock" style={{ marginRight: 4 }} />Pending</span>
+                          }
                         </td>
                         <td style={styles.td}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -286,6 +319,22 @@ export default function UserManager() {
 
 function EnrollmentPanel({ user, programs, onRemove, onAdd, onClose }) {
   const [addId, setAddId] = useState('');
+  const [resetStatus, setResetStatus] = useState(''); // '' | 'sending' | 'sent' | 'error'
+  const [copied, setCopied] = useState(false);
+
+  async function sendResetEmail() {
+    setResetStatus('sending');
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetStatus(error ? 'error' : 'sent');
+  }
+
+  function copyInviteLink() {
+    navigator.clipboard.writeText(`${window.location.origin}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   const enrolled = (user.user_program_enrollments || []);
   const enrolledIds = enrolled.map(e => e.program_id);
   const unenrolled = programs.filter(p => !enrolledIds.includes(p.id));
@@ -334,6 +383,32 @@ function EnrollmentPanel({ user, programs, onRemove, onAdd, onClose }) {
             </div>
           </div>
         )}
+
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--gray-100)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--gray-500)', marginBottom: 10 }}>Account Access</div>
+          {user.auth_id ? (
+            <>
+              <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 8 }}>User has an active account. Send a password reset email if they're locked out.</p>
+              {resetStatus === 'sent'
+                ? <div style={{ fontSize: 13, color: '#059669', fontWeight: 500 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />Reset email sent.</div>
+                : resetStatus === 'error'
+                  ? <div style={{ fontSize: 13, color: '#D92D20' }}>Failed to send. Try again.</div>
+                  : <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 13 }} onClick={sendResetEmail} disabled={resetStatus === 'sending'}>
+                      <i className="fa-solid fa-key" />
+                      {resetStatus === 'sending' ? 'Sending…' : 'Send Password Reset Email'}
+                    </button>
+              }
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 8 }}>This user hasn't created their account yet. Share the app link so they can sign up with <strong>{user.email}</strong>.</p>
+              <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 13 }} onClick={copyInviteLink}>
+                <i className="fa-solid fa-link" />
+                {copied ? 'Copied!' : 'Copy App Link'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
