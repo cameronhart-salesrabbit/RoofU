@@ -3,18 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
 export default function AdminLogin() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAdminAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (login(password)) {
+    setLoading(true);
+    setError('');
+    const result = await login(email, password);
+    if (result.success) {
       navigate('/admin');
     } else {
-      setError('Incorrect password. Please try again.');
+      setError(result.message);
     }
+    setLoading(false);
   };
 
   return (
@@ -27,18 +33,29 @@ export default function AdminLogin() {
         <h2 style={styles.title}>Sign in to Admin</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Admin Password</label>
+            <label>Email</label>
             <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter admin password"
+              required
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@company.com"
               autoFocus
             />
           </div>
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              required
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
           {error && <p style={styles.error}>{error}</p>}
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '10px' }}>
-            Sign In
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '10px' }} disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In →'}
           </button>
         </form>
       </div>
@@ -47,55 +64,12 @@ export default function AdminLogin() {
 }
 
 const styles = {
-  wrapper: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--gray-50)',
-  },
-  card: {
-    background: 'var(--white)',
-    border: '1px solid var(--gray-200)',
-    borderRadius: '12px',
-    padding: '40px',
-    width: '100%',
-    maxWidth: '400px',
-    boxShadow: 'var(--shadow-lg)',
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '24px',
-  },
-  logoText: {
-    fontSize: '28px',
-    fontWeight: '800',
-    color: 'var(--gray-900)',
-    letterSpacing: '-0.5px',
-  },
-  logoU: {
-    color: 'var(--red)',
-  },
-  adminBadge: {
-    background: 'var(--red-light)',
-    color: 'var(--red)',
-    fontSize: '11px',
-    fontWeight: '700',
-    padding: '2px 8px',
-    borderRadius: '999px',
-    letterSpacing: '0.5px',
-  },
-  title: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: 'var(--gray-900)',
-    marginBottom: '20px',
-  },
-  error: {
-    color: 'var(--red)',
-    fontSize: '13px',
-    marginBottom: '12px',
-  },
+  wrapper: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50)' },
+  card: { background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 12, padding: 40, width: '100%', maxWidth: 400, boxShadow: 'var(--shadow-lg)' },
+  logo: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 },
+  logoText: { fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, color: 'var(--gray-900)' },
+  logoU: { color: 'var(--red)' },
+  adminBadge: { background: 'var(--red-light)', color: 'var(--red)', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, letterSpacing: '0.5px' },
+  title: { fontSize: 18, fontWeight: 700, color: 'var(--gray-900)', marginBottom: 20 },
+  error: { color: '#D92D20', fontSize: 13, marginBottom: 12 },
 };

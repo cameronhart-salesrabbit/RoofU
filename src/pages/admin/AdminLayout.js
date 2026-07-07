@@ -12,13 +12,14 @@ const NAV = [
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, logout } = useAdminAuth();
+  const { isAdmin, loading, logout } = useAdminAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAdmin) navigate('/admin/login');
-  }, [isAdmin, navigate]);
+    if (!loading && !isAdmin) navigate('/admin/login');
+  }, [isAdmin, loading, navigate]);
 
+  if (loading) return null;
   if (!isAdmin) return null;
 
   return (
