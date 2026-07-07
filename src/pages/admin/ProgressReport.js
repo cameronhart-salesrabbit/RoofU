@@ -4,7 +4,6 @@ import { supabase } from '../../supabase/client';
 export default function ProgressReport() {
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [quizzes, setQuizzes] = useState([]);
   const [progress, setProgress] = useState([]);
   const [quizResults, setQuizResults] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -12,18 +11,16 @@ export default function ProgressReport() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: u }, { data: c }, { data: p }, { data: qr }, { data: qz }] = await Promise.all([
+      const [{ data: u }, { data: c }, { data: p }, { data: qr }] = await Promise.all([
         supabase.from('users').select('*').order('name'),
         supabase.from('courses').select('*, sections(*, lessons(*))'),
         supabase.from('progress').select('*'),
         supabase.from('quiz_results').select('*, quizzes(title, pass_threshold)').order('completed_at', { ascending: false }),
-        supabase.from('quizzes').select('id, title, pass_threshold'),
       ]);
       setUsers(u || []);
       setCourses(c || []);
       setProgress(p || []);
       setQuizResults(qr || []);
-      setQuizzes(qz || []);
       setLoading(false);
     }
     load();
