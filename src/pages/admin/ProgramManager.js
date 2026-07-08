@@ -10,6 +10,7 @@ export default function ProgramManager() {
   const [form, setForm] = useState({ title: '', description: '', courseIds: [] });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [courseSearch, setCourseSearch] = useState('');
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -27,6 +28,7 @@ export default function ProgramManager() {
   function openNew() {
     setEditing(null);
     setForm({ title: '', description: '', courseIds: [] });
+    setCourseSearch('');
     setShowForm(true);
   }
 
@@ -36,6 +38,7 @@ export default function ProgramManager() {
       .sort((a, b) => a.order - b.order)
       .map(pc => pc.course_id);
     setForm({ title: prog.title, description: prog.description || '', courseIds: ids });
+    setCourseSearch('');
     setShowForm(true);
   }
 
@@ -114,15 +117,30 @@ export default function ProgramManager() {
                 <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What will learners get from this program?" style={{ resize: 'vertical' }} />
               </div>
               <div className="form-group">
-                <label>Courses in this Program</label>
+                <label>Courses in this Program {form.courseIds.length > 0 && <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>({form.courseIds.length} selected)</span>}</label>
+                {courses.length > 0 && (
+                  <input
+                    type="search"
+                    placeholder="Search courses…"
+                    value={courseSearch}
+                    onChange={e => setCourseSearch(e.target.value)}
+                    style={styles.courseSearchInput}
+                  />
+                )}
                 <div style={styles.checkList}>
-                  {courses.length === 0 && <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet — create some first.</p>}
-                  {courses.map(c => (
-                    <label key={c.id} style={styles.checkItem}>
-                      <input type="checkbox" checked={form.courseIds.includes(c.id)} onChange={() => toggleCourse(c.id)} />
-                      {c.title}
-                    </label>
-                  ))}
+                  {courses.length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet — create some first.</p>
+                  ) : (() => {
+                    const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(courseSearch.toLowerCase()));
+                    return filteredCourses.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses match "{courseSearch}".</p>
+                    ) : filteredCourses.map(c => (
+                      <label key={c.id} style={styles.checkItem}>
+                        <input type="checkbox" checked={form.courseIds.includes(c.id)} onChange={() => toggleCourse(c.id)} />
+                        {c.title}
+                      </label>
+                    ));
+                  })()}
                 </div>
               </div>
               <div style={styles.modalFooter}>
@@ -171,6 +189,7 @@ const styles = {
   modal: { width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 20 },
   modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
+  courseSearchInput: { width: '100%', padding: '7px 10px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', marginBottom: 8, boxSizing: 'border-box' },
   checkList: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', padding: 4 },
   checkItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
