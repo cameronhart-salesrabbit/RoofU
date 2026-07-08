@@ -47,10 +47,6 @@ export default function ProgressReport() {
 
   return (
     <div className="page-fade">
-      <div className="page-header">
-        <h1>Learner Progress</h1>
-      </div>
-
       <div style={styles.layout}>
         {/* User list */}
         <div style={styles.userList}>

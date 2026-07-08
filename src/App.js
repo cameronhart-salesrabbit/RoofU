@@ -6,6 +6,7 @@ import { ProgressProvider } from './context/ProgressContext';
 // Admin pages
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './pages/admin/AdminLayout';
+import AnalyticsLayout from './pages/admin/AnalyticsLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ProgramManager from './pages/admin/ProgramManager';
 import CourseBuilder from './pages/admin/CourseBuilder';
@@ -37,15 +38,19 @@ function App() {
           {/* Admin routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
+            <Route index element={<Navigate to="analytics/dashboard" replace />} />
+            <Route path="analytics" element={<AnalyticsLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="progress" element={<ProgressReport />} />
+              <Route path="completion" element={<CompletionReport />} />
+              <Route path="quiz" element={<QuizAnalytics />} />
+            </Route>
             <Route path="programs" element={<ProgramManager />} />
             <Route path="courses" element={<CourseBuilder />} />
             <Route path="courses/:courseId" element={<CourseBuilder />} />
             <Route path="quizzes/:quizId" element={<QuizBuilder />} />
             <Route path="users" element={<UserManager />} />
-            <Route path="progress" element={<ProgressReport />} />
-            <Route path="completion" element={<CompletionReport />} />
-            <Route path="quiz-analytics" element={<QuizAnalytics />} />
           </Route>
 
           {/* Learner routes */}

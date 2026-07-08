@@ -54,10 +54,6 @@ export default function QuizAnalytics() {
 
   return (
     <div className="page-fade">
-      <div className="page-header">
-        <h1>Quiz Analytics</h1>
-      </div>
-
       <div style={styles.summaryRow}>
         {[
           { label: 'Quizzes', value: quizzes.length },

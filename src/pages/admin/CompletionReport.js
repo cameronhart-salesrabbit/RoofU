@@ -49,10 +49,6 @@ export default function CompletionReport() {
 
   return (
     <div className="page-fade">
-      <div className="page-header">
-        <h1>Completion Overview</h1>
-      </div>
-
       <div style={styles.layout}>
         {/* Course list */}
         <div style={styles.courseList}>

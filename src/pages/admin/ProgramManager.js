@@ -9,6 +9,7 @@ export default function ProgramManager() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', courseIds: [] });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -78,11 +79,25 @@ export default function ProgramManager() {
     }));
   }
 
+  const filteredPrograms = programs.filter(p =>
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
+    (p.description || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div>
       <div className="page-header">
         <h1>Programs</h1>
-        <button className="btn btn-primary" onClick={openNew}>+ New Program</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            type="search"
+            placeholder="Search programs…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={styles.searchInput}
+          />
+          <button className="btn btn-primary" onClick={openNew}>+ New Program</button>
+        </div>
       </div>
 
       {showForm && (
@@ -124,9 +139,13 @@ export default function ProgramManager() {
           <div className="card empty-state">
             <p>No programs yet. Create your first program to get started.</p>
           </div>
+        ) : filteredPrograms.length === 0 ? (
+          <div className="card empty-state">
+            <p>No programs match "{search}".</p>
+          </div>
         ) : (
           <div style={styles.list}>
-            {programs.map(prog => (
+            {filteredPrograms.map(prog => (
               <div key={prog.id} className="card" style={styles.row}>
                 <div style={styles.rowInfo}>
                   <h3 style={styles.rowTitle}>{prog.title}</h3>
@@ -147,6 +166,7 @@ export default function ProgramManager() {
 }
 
 const styles = {
+  searchInput: { padding: '8px 12px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', width: 220 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 },
   modal: { width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 20 },

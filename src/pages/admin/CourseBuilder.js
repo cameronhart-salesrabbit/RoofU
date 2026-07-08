@@ -34,6 +34,7 @@ export default function CourseBuilder() {
   const [sectionForm, setSectionForm] = useState({ title: '' });
   const [expandedSection, setExpandedSection] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [courseSearch, setCourseSearch] = useState('');
 
   useEffect(() => { fetchCourses(); }, []);
   useEffect(() => {
@@ -161,17 +162,30 @@ export default function CourseBuilder() {
     await Promise.all(reordered.map((s, i) => supabase.from('sections').update({ order: i }).eq('id', s.id)));
   }
 
+  const filteredCourses = courses.filter(c =>
+    c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
+    (c.product || '').toLowerCase().includes(courseSearch.toLowerCase())
+  );
+
   return (
     <div style={styles.layout}>
       {/* Course list panel */}
       <div style={styles.listPanel}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h2 style={styles.panelTitle}>Courses</h2>
           <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { setEditingCourse(null); setCourseForm({ title: '', description: '', product: PRODUCTS[0] }); setShowCourseForm(true); }}>+ New</button>
         </div>
+        <input
+          type="search"
+          placeholder="Search courses…"
+          value={courseSearch}
+          onChange={e => setCourseSearch(e.target.value)}
+          style={styles.searchInput}
+        />
         {loading ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>Loading…</p> : (
-          courses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet.</p> : (
-            courses.map(c => (
+          courses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet.</p> :
+          filteredCourses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses match "{courseSearch}".</p> : (
+            filteredCourses.map(c => (
               <div
                 key={c.id}
                 style={{ ...styles.courseItem, ...(selected?.id === c.id ? styles.courseItemActive : {}) }}
@@ -479,6 +493,7 @@ const styles = {
   listPanel: { width: 240, minWidth: 240, background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: 16, position: 'sticky', top: 0 },
   detailPanel: { flex: 1 },
   panelTitle: { fontSize: 15, fontWeight: 700, color: 'var(--gray-700)' },
+  searchInput: { width: '100%', padding: '7px 10px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
   courseItem: { padding: '10px 12px', borderRadius: 6, cursor: 'pointer', marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 4, border: '1px solid transparent' },
   courseItemActive: { background: 'var(--red-light)', border: '1px solid var(--red)', },
   courseItemTitle: { fontSize: 13, fontWeight: 600, color: 'var(--gray-800)' },

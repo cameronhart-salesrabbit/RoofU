@@ -3,13 +3,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
 const NAV = [
-  { to: '/admin', label: 'Dashboard', icon: 'fa-solid fa-chart-line', end: true },
+  { to: '/admin/analytics', label: 'Analytics', icon: 'fa-solid fa-chart-line' },
   { to: '/admin/programs', label: 'Programs', icon: 'fa-solid fa-layer-group' },
   { to: '/admin/courses', label: 'Courses', icon: 'fa-solid fa-book-open' },
   { to: '/admin/users', label: 'Users', icon: 'fa-solid fa-users' },
-  { to: '/admin/progress', label: 'Progress', icon: 'fa-solid fa-chart-bar' },
-  { to: '/admin/completion', label: 'Completion', icon: 'fa-solid fa-circle-check' },
-  { to: '/admin/quiz-analytics', label: 'Quiz Analytics', icon: 'fa-solid fa-clipboard-question' },
 ];
 
 export default function AdminLayout() {

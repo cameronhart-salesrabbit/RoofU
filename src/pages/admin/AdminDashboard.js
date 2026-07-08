@@ -60,10 +60,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-fade">
-      <div className="page-header">
-        <h1>Dashboard</h1>
-      </div>
-
       {/* Stat cards */}
       <div style={styles.statsGrid}>
         {statCards.map(({ label, value, path }) => (
