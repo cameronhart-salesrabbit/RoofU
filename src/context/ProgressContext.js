@@ -9,22 +9,33 @@ export function ProgressProvider({ children }) {
 
   // Reactively track the logged-in learner's users.id (not auth.users.id)
   useEffect(() => {
-    async function resolveId(authUserId) {
+    async function resolveId(authUserId, authEmail) {
       if (!authUserId) { setLearnerId(null); return; }
       const { data } = await supabase
         .from('users')
         .select('id')
         .eq('auth_id', authUserId)
         .single();
-      setLearnerId(data?.id || null);
+      if (data) { setLearnerId(data.id); return; }
+
+      // Fallback in case the DB auto-link trigger missed this signup: link by email instead.
+      if (authEmail) {
+        const { data: byEmail } = await supabase.from('users').select('id').ilike('email', authEmail).is('auth_id', null).single();
+        if (byEmail) {
+          await supabase.from('users').update({ auth_id: authUserId }).eq('id', byEmail.id);
+          setLearnerId(byEmail.id);
+          return;
+        }
+      }
+      setLearnerId(null);
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      resolveId(data.session?.user?.id || null);
+      resolveId(data.session?.user?.id || null, data.session?.user?.email || null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      resolveId(session?.user?.id || null);
+      resolveId(session?.user?.id || null, session?.user?.email || null);
     });
 
     return () => subscription.unsubscribe();

@@ -13,11 +13,20 @@ export default function LearnerLayout() {
   const isLessonView = location.pathname.startsWith('/lessons/');
 
   useEffect(() => {
-    async function loadProfile(authUserId) {
+    async function loadProfile(authUserId, authEmail) {
       if (!authUserId) { setUser(null); setAuthLoading(false); return; }
       try {
-        const { data, error } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
-        if (error && error.code !== 'PGRST116') console.error('Profile load error:', error);
+        let { data, error } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
+        if (!data && authEmail) {
+          // Fallback in case the DB auto-link trigger missed this signup: link by email instead.
+          const { data: byEmail } = await supabase.from('users').select('*').ilike('email', authEmail).is('auth_id', null).single();
+          if (byEmail) {
+            const { data: linked } = await supabase.from('users').update({ auth_id: authUserId }).eq('id', byEmail.id).select().single();
+            data = linked;
+          }
+        } else if (error && error.code !== 'PGRST116') {
+          console.error('Profile load error:', error);
+        }
         setUser(data || null);
       } catch (e) {
         console.error('Profile load exception:', e);
@@ -27,11 +36,11 @@ export default function LearnerLayout() {
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      loadProfile(data.session?.user?.id || null);
+      loadProfile(data.session?.user?.id || null, data.session?.user?.email || null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      loadProfile(session?.user?.id || null);
+      loadProfile(session?.user?.id || null, session?.user?.email || null);
     });
 
     return () => subscription.unsubscribe();
