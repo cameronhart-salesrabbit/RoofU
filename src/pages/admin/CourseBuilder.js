@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
 import RichTextEditor from '../../components/RichTextEditor';
 import {
@@ -17,86 +17,41 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-const PRODUCTS = ['SalesRabbit', 'SalesRabbit+', 'RoofLink', 'Roofle', 'Roofing General'];
-
 export default function CourseBuilder() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const [courses, setCourses] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCourseForm, setShowCourseForm] = useState(false);
-  const [editingCourse, setEditingCourse] = useState(null);
-  const [courseForm, setCourseForm] = useState({ title: '', description: '', product: PRODUCTS[0] });
   const [showSectionForm, setShowSectionForm] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
   const [sectionForm, setSectionForm] = useState({ title: '' });
   const [expandedSection, setExpandedSection] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [courseSearch, setCourseSearch] = useState('');
 
-  useEffect(() => { fetchCourses(); }, []);
-  useEffect(() => {
-    if (courseId && courses.length > 0) {
-      const c = courses.find(c => c.id === courseId);
-      if (c) selectCourse(c);
-    }
-  }, [courseId, courses]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function fetchCourses() {
+  const loadCourse = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
-    setCourses(data || []);
+    const { data: c } = await supabase.from('courses').select('*').eq('id', courseId).single();
+    setCourse(c || null);
+    const { data: secs } = await supabase.from('sections').select('*, lessons(*)').eq('course_id', courseId).order('order');
+    setSections(secs || []);
     setLoading(false);
-  }
+  }, [courseId]);
 
-  async function selectCourse(course) {
-    setSelected(course);
-    navigate(`/admin/courses/${course.id}`, { replace: true });
-    const { data } = await supabase
-      .from('sections')
-      .select('*, lessons(*)')
-      .eq('course_id', course.id)
-      .order('order');
-    setSections(data || []);
-  }
-
-  async function saveCourse(e) {
-    e.preventDefault();
-    setSaving(true);
-    if (editingCourse) {
-      await supabase.from('courses').update({ ...courseForm, updated_at: new Date() }).eq('id', editingCourse.id);
-    } else {
-      const { data } = await supabase.from('courses').insert(courseForm).select().single();
-      if (data) selectCourse(data);
-    }
-    setSaving(false);
-    setShowCourseForm(false);
-    fetchCourses();
-  }
-
-  async function deleteCourse(id) {
-    if (!window.confirm('Delete this course and all its sections and lessons?')) return;
-    await supabase.from('courses').delete().eq('id', id);
-    setSelected(null);
-    navigate('/admin/courses', { replace: true });
-    fetchCourses();
-  }
+  useEffect(() => { loadCourse(); }, [loadCourse]);
 
   async function togglePublish() {
-    const newVal = !selected.is_published;
-    const { error } = await supabase.from('courses').update({ is_published: newVal }).eq('id', selected.id);
+    const newVal = !course.is_published;
+    const { error } = await supabase.from('courses').update({ is_published: newVal }).eq('id', course.id);
     if (error) {
       console.error('togglePublish failed', error);
       alert(`Couldn't update publish status: ${error.message}`);
       return;
     }
-    setSelected(s => ({ ...s, is_published: newVal }));
-    setCourses(cs => cs.map(c => c.id === selected.id ? { ...c, is_published: newVal } : c));
+    setCourse(c => ({ ...c, is_published: newVal }));
   }
 
-  async function duplicateCourse(course) {
+  async function duplicateCourse() {
     if (!window.confirm(`Duplicate "${course.title}"? A draft copy will be created.`)) return;
     const { data: newCourse, error: courseErr } = await supabase.from('courses').insert({
       title: `${course.title} (Copy)`, description: course.description, product: course.product, is_published: false,
@@ -127,8 +82,13 @@ export default function CourseBuilder() {
       console.error('duplicateCourse: partial failures', errors);
       alert(`Course was duplicated, but some content couldn't be copied:\n${errors.slice(0, 5).join('\n')}`);
     }
-    await fetchCourses();
-    selectCourse(newCourse);
+    navigate(`/admin/courses/${newCourse.id}`);
+  }
+
+  async function deleteCourse() {
+    if (!window.confirm('Delete this course and all its sections and lessons?')) return;
+    await supabase.from('courses').delete().eq('id', course.id);
+    navigate('/admin/courses');
   }
 
   async function saveSection(e) {
@@ -137,17 +97,17 @@ export default function CourseBuilder() {
     if (editingSection) {
       await supabase.from('sections').update({ title: sectionForm.title }).eq('id', editingSection.id);
     } else {
-      await supabase.from('sections').insert({ title: sectionForm.title, course_id: selected.id, order: sections.length });
+      await supabase.from('sections').insert({ title: sectionForm.title, course_id: course.id, order: sections.length });
     }
     setSaving(false);
     setShowSectionForm(false);
-    selectCourse(selected);
+    loadCourse();
   }
 
   async function deleteSection(id) {
     if (!window.confirm('Delete this section and all its lessons?')) return;
     await supabase.from('sections').delete().eq('id', id);
-    selectCourse(selected);
+    loadCourse();
   }
 
   const sensors = useSensors(useSensor(PointerSensor));
@@ -162,130 +122,64 @@ export default function CourseBuilder() {
     await Promise.all(reordered.map((s, i) => supabase.from('sections').update({ order: i }).eq('id', s.id)));
   }
 
-  const filteredCourses = courses.filter(c =>
-    c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
-    (c.product || '').toLowerCase().includes(courseSearch.toLowerCase())
-  );
+  if (loading) return <p style={{ color: 'var(--gray-400)' }}>Loading…</p>;
+
+  if (!course) {
+    return (
+      <div>
+        <Link to="/admin/courses" style={styles.backLink}><i className="fa-solid fa-arrow-left" /> Back to Courses</Link>
+        <div className="card empty-state" style={{ marginTop: 16 }}><p>Course not found.</p></div>
+      </div>
+    );
+  }
 
   return (
-    <div style={styles.layout}>
-      {/* Course list panel */}
-      <div style={styles.listPanel}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={styles.panelTitle}>Courses</h2>
-          <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { setEditingCourse(null); setCourseForm({ title: '', description: '', product: PRODUCTS[0] }); setShowCourseForm(true); }}>+ New</button>
+    <div>
+      <Link to="/admin/courses" style={styles.backLink}><i className="fa-solid fa-arrow-left" /> Back to Courses</Link>
+
+      <div className="page-header">
+        <div>
+          <h1 style={{ fontSize: 20 }}>{course.title}</h1>
+          <span className="badge badge-red" style={{ marginTop: 4 }}>{course.product}</span>
         </div>
-        <input
-          type="search"
-          placeholder="Search courses…"
-          value={courseSearch}
-          onChange={e => setCourseSearch(e.target.value)}
-          style={styles.searchInput}
-        />
-        {loading ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>Loading…</p> : (
-          courses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet.</p> :
-          filteredCourses.length === 0 ? <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses match "{courseSearch}".</p> : (
-            filteredCourses.map(c => (
-              <div
-                key={c.id}
-                style={{ ...styles.courseItem, ...(selected?.id === c.id ? styles.courseItemActive : {}) }}
-                onClick={() => selectCourse(c)}
-              >
-                <span style={styles.courseItemTitle}>{c.title}</span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <span className="badge badge-gray" style={{ fontSize: 11 }}>{c.product}</span>
-                  {!c.is_published && <span className="badge" style={{ fontSize: 11, background: '#FEF7F2', color: 'var(--red)' }}>Draft</span>}
-                </div>
-              </div>
-            ))
-          )
-        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            style={course.is_published ? { background: '#F4F6F1', color: '#404A34', border: '1px solid #9AB485' } : {}}
+            onClick={togglePublish}
+          >
+            <i className={`fa-solid fa-${course.is_published ? 'eye' : 'eye-slash'}`} />
+            {course.is_published ? 'Published' : 'Draft'}
+          </button>
+          <button className="btn btn-secondary" onClick={duplicateCourse}><i className="fa-solid fa-copy" /> Duplicate</button>
+          <button className="btn btn-secondary" onClick={() => window.open(`/courses/${course.id}`, '_blank')}><i className="fa-solid fa-eye" /> Preview</button>
+          <button className="btn btn-danger" onClick={deleteCourse}>Delete</button>
+        </div>
       </div>
 
-      {/* Course detail panel */}
-      <div style={styles.detailPanel}>
-        {!selected ? (
-          <div className="empty-state">
-            <p>Select a course or create a new one to get started.</p>
-          </div>
-        ) : (
-          <>
-            <div className="page-header">
-              <div>
-                <h1 style={{ fontSize: 20 }}>{selected.title}</h1>
-                <span className="badge badge-red" style={{ marginTop: 4 }}>{selected.product}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-secondary"
-                  style={selected.is_published ? { background: '#F4F6F1', color: '#404A34', border: '1px solid #9AB485' } : {}}
-                  onClick={togglePublish}
-                >
-                  <i className={`fa-solid fa-${selected.is_published ? 'eye' : 'eye-slash'}`} />
-                  {selected.is_published ? 'Published' : 'Draft'}
-                </button>
-                <button className="btn btn-secondary" onClick={() => duplicateCourse(selected)}><i className="fa-solid fa-copy" /> Duplicate</button>
-                <button className="btn btn-secondary" onClick={() => window.open(`/courses/${selected.id}`, '_blank')}><i className="fa-solid fa-eye" /> Preview</button>
-                <button className="btn btn-secondary" onClick={() => { setEditingCourse(selected); setCourseForm({ title: selected.title, description: selected.description || '', product: selected.product }); setShowCourseForm(true); }}>Edit</button>
-                <button className="btn btn-danger" onClick={() => deleteCourse(selected.id)}>Delete</button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h2 style={styles.panelTitle}>Sections</h2>
-              <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { setEditingSection(null); setSectionForm({ title: '' }); setShowSectionForm(true); }}>+ Add Section</button>
-            </div>
-
-            {sections.length === 0 ? (
-              <div className="card empty-state"><p>No sections yet. Add a section to start building this course.</p></div>
-            ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                  {sections.map(sec => (
-                    <SectionCard
-                      key={sec.id}
-                      section={sec}
-                      expanded={expandedSection === sec.id}
-                      onToggle={() => setExpandedSection(expandedSection === sec.id ? null : sec.id)}
-                      onEdit={() => { setEditingSection(sec); setSectionForm({ title: sec.title }); setShowSectionForm(true); }}
-                      onDelete={() => deleteSection(sec.id)}
-                      onRefresh={() => selectCourse(selected)}
-                    />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            )}
-          </>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h2 style={styles.panelTitle}>Sections</h2>
+        <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { setEditingSection(null); setSectionForm({ title: '' }); setShowSectionForm(true); }}>+ Add Section</button>
       </div>
 
-      {/* Course form modal */}
-      {showCourseForm && (
-        <div style={styles.overlay}>
-          <div className="card" style={styles.modal}>
-            <h2 style={styles.modalTitle}>{editingCourse ? 'Edit Course' : 'New Course'}</h2>
-            <form onSubmit={saveCourse}>
-              <div className="form-group">
-                <label>Course Title *</label>
-                <input required value={courseForm.title} onChange={e => setCourseForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. SalesRabbit Core" />
-              </div>
-              <div className="form-group">
-                <label>Product</label>
-                <select value={courseForm.product} onChange={e => setCourseForm(f => ({ ...f, product: e.target.value }))}>
-                  {PRODUCTS.map(p => <option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea rows={3} value={courseForm.description} onChange={e => setCourseForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical' }} />
-              </div>
-              <div style={styles.modalFooter}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCourseForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save Course'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {sections.length === 0 ? (
+        <div className="card empty-state"><p>No sections yet. Add a section to start building this course.</p></div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+          <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+            {sections.map(sec => (
+              <SectionCard
+                key={sec.id}
+                section={sec}
+                expanded={expandedSection === sec.id}
+                onToggle={() => setExpandedSection(expandedSection === sec.id ? null : sec.id)}
+                onEdit={() => { setEditingSection(sec); setSectionForm({ title: sec.title }); setShowSectionForm(true); }}
+                onDelete={() => deleteSection(sec.id)}
+                onRefresh={loadCourse}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Section form modal */}
@@ -489,14 +383,8 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
 }
 
 const styles = {
-  layout: { display: 'flex', gap: 24, alignItems: 'flex-start' },
-  listPanel: { width: 240, minWidth: 240, background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: 16, position: 'sticky', top: 0 },
-  detailPanel: { flex: 1 },
+  backLink: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gray-500)', textDecoration: 'none', marginBottom: 16 },
   panelTitle: { fontSize: 15, fontWeight: 700, color: 'var(--gray-700)' },
-  searchInput: { width: '100%', padding: '7px 10px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
-  courseItem: { padding: '10px 12px', borderRadius: 6, cursor: 'pointer', marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 4, border: '1px solid transparent' },
-  courseItemActive: { background: 'var(--red-light)', border: '1px solid var(--red)', },
-  courseItemTitle: { fontSize: 13, fontWeight: 600, color: 'var(--gray-800)' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 },
   modal: { width: '100%', maxWidth: 540, padding: 28, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 20 },

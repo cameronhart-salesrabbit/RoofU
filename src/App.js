@@ -9,6 +9,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import AnalyticsLayout from './pages/admin/AnalyticsLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ProgramManager from './pages/admin/ProgramManager';
+import CourseList from './pages/admin/CourseList';
 import CourseBuilder from './pages/admin/CourseBuilder';
 import QuizBuilder from './pages/admin/QuizBuilder';
 import UserManager from './pages/admin/UserManager';
@@ -47,7 +48,7 @@ function App() {
               <Route path="quiz" element={<QuizAnalytics />} />
             </Route>
             <Route path="programs" element={<ProgramManager />} />
-            <Route path="courses" element={<CourseBuilder />} />
+            <Route path="courses" element={<CourseList />} />
             <Route path="courses/:courseId" element={<CourseBuilder />} />
             <Route path="quizzes/:quizId" element={<QuizBuilder />} />
             <Route path="users" element={<UserManager />} />
