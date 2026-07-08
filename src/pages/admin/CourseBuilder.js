@@ -92,23 +92,34 @@ export default function CourseBuilder() {
 
   async function duplicateCourse(course) {
     if (!window.confirm(`Duplicate "${course.title}"? A draft copy will be created.`)) return;
-    const { data: newCourse } = await supabase.from('courses').insert({
+    const { data: newCourse, error: courseErr } = await supabase.from('courses').insert({
       title: `${course.title} (Copy)`, description: course.description, product: course.product, is_published: false,
     }).select().single();
-    if (!newCourse) return;
-    const { data: secs } = await supabase.from('sections').select('*, lessons(*)').eq('course_id', course.id).order('order');
+    if (courseErr || !newCourse) {
+      console.error('duplicateCourse: course insert failed', courseErr);
+      alert(`Couldn't duplicate course: ${courseErr?.message || 'unknown error'}`);
+      return;
+    }
+    const { data: secs, error: secsErr } = await supabase.from('sections').select('*, lessons(*)').eq('course_id', course.id).order('order');
+    if (secsErr) console.error('duplicateCourse: sections fetch failed', secsErr);
+    const errors = [];
     for (const sec of secs || []) {
-      const { data: newSec } = await supabase.from('sections').insert({ title: sec.title, course_id: newCourse.id, order: sec.order }).select().single();
-      if (!newSec) continue;
+      const { data: newSec, error: newSecErr } = await supabase.from('sections').insert({ title: sec.title, course_id: newCourse.id, order: sec.order }).select().single();
+      if (newSecErr || !newSec) { errors.push(`section "${sec.title}": ${newSecErr?.message || 'unknown error'}`); continue; }
       const sortedLessons = (sec.lessons || []).sort((a, b) => a.order - b.order);
       for (const lesson of sortedLessons) {
-        await supabase.from('lessons').insert({
+        const { error: lessonErr } = await supabase.from('lessons').insert({
           title: lesson.title, section_id: newSec.id, order: lesson.order,
           video_type: lesson.video_type, video_url: lesson.video_url,
           written_content: lesson.written_content, duration_minutes: lesson.duration_minutes,
           attachment_url: lesson.attachment_url, attachment_name: lesson.attachment_name,
         });
+        if (lessonErr) errors.push(`lesson "${lesson.title}": ${lessonErr.message}`);
       }
+    }
+    if (errors.length) {
+      console.error('duplicateCourse: partial failures', errors);
+      alert(`Course was duplicated, but some content couldn't be copied:\n${errors.slice(0, 5).join('\n')}`);
     }
     await fetchCourses();
     selectCourse(newCourse);
@@ -328,12 +339,17 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
   }
 
   async function duplicateLesson(lesson) {
-    await supabase.from('lessons').insert({
+    const { error } = await supabase.from('lessons').insert({
       title: `${lesson.title} (Copy)`, section_id: section.id, order: lessons.length,
       video_type: lesson.video_type, video_url: lesson.video_url,
       written_content: lesson.written_content, duration_minutes: lesson.duration_minutes,
       attachment_url: lesson.attachment_url, attachment_name: lesson.attachment_name,
     });
+    if (error) {
+      console.error('duplicateLesson failed', error);
+      alert(`Couldn't duplicate lesson: ${error.message}`);
+      return;
+    }
     const { data } = await supabase.from('lessons').select('*').eq('section_id', section.id).order('order');
     setLessons(data || []);
   }
