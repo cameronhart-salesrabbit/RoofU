@@ -1,6 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
 
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+      } else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result.map(s => s.trim());
+}
+
+function parseCsv(text) {
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const header = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+  const nameIdx = header.findIndex(h => h.includes('name'));
+  const emailIdx = header.findIndex(h => h.includes('email'));
+  const roleIdx = header.findIndex(h => h.includes('role'));
+  return lines.slice(1).map(line => {
+    const cols = parseCsvLine(line);
+    const name = nameIdx >= 0 ? (cols[nameIdx] || '') : '';
+    const email = emailIdx >= 0 ? (cols[emailIdx] || '') : '';
+    const roleRaw = roleIdx >= 0 ? (cols[roleIdx] || '').toLowerCase() : '';
+    return { name, email, role: roleRaw === 'admin' ? 'admin' : 'learner' };
+  });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function UserManager() {
   const [users, setUsers] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -14,6 +50,11 @@ export default function UserManager() {
   const [bulkProgramId, setBulkProgramId] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [detailUser, setDetailUser] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importRows, setImportRows] = useState([]);
+  const [importProgramId, setImportProgramId] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -163,6 +204,74 @@ export default function UserManager() {
     fetchAll();
   }
 
+  function openImport() {
+    setImportRows([]);
+    setImportProgramId('');
+    setImportResult(null);
+    setShowImport(true);
+  }
+
+  function closeImport() {
+    setShowImport(false);
+    setImportRows([]);
+    setImportResult(null);
+    setImportProgramId('');
+  }
+
+  function downloadImportTemplate() {
+    const csv = 'name,email,role\nJane Smith,jane@example.com,learner\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'roofu-user-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleCsvFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const rows = parseCsv(String(ev.target.result));
+      const existingEmails = new Set(users.map(u => u.email.toLowerCase()));
+      const seen = new Set();
+      const validated = rows.map(r => {
+        let status = 'ok';
+        if (!r.name || !r.email) status = 'missing_fields';
+        else if (!EMAIL_RE.test(r.email)) status = 'invalid_email';
+        else if (existingEmails.has(r.email.toLowerCase())) status = 'duplicate';
+        else if (seen.has(r.email.toLowerCase())) status = 'duplicate_in_file';
+        if (status === 'ok') seen.add(r.email.toLowerCase());
+        return { ...r, status };
+      });
+      setImportRows(validated);
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleImport() {
+    const toImport = importRows.filter(r => r.status === 'ok');
+    if (toImport.length === 0) return;
+    setImporting(true);
+    let created = 0, failed = 0;
+    const newUserIds = [];
+    for (const row of toImport) {
+      const { data, error } = await supabase.from('users').insert({ name: row.name, email: row.email, role: row.role }).select().single();
+      if (error || !data) { failed++; console.error('CSV import failed for', row.email, error); continue; }
+      created++;
+      newUserIds.push(data.id);
+      await sendWelcomeEmail(row.name, row.email);
+    }
+    if (importProgramId && newUserIds.length > 0) {
+      await supabase.from('user_program_enrollments').insert(newUserIds.map(uid => ({ user_id: uid, program_id: importProgramId })));
+    }
+    setImporting(false);
+    setImportResult({ created, failed, skipped: importRows.length - toImport.length });
+    fetchAll();
+  }
+
   function toggleProgram(id) {
     setForm(f => ({
       ...f,
@@ -180,9 +289,91 @@ export default function UserManager() {
               Enroll {selectedUserIds.length} User{selectedUserIds.length !== 1 ? 's' : ''} →
             </button>
           )}
+          <button className="btn btn-secondary" onClick={openImport}><i className="fa-solid fa-file-csv" /> Import CSV</button>
           <button className="btn btn-primary" onClick={openNew}>+ Add User</button>
         </div>
       </div>
+
+      {showImport && (
+        <div style={styles.overlay}>
+          <div className="card" style={{ ...styles.modal, maxWidth: 640 }}>
+            <h2 style={styles.modalTitle}>Import Users from CSV</h2>
+
+            {importResult ? (
+              <>
+                <div style={{ fontSize: 14, color: 'var(--gray-700)', marginBottom: 20, lineHeight: 1.6 }}>
+                  <p><strong>{importResult.created}</strong> user{importResult.created !== 1 ? 's' : ''} created and welcome emails sent.</p>
+                  {importResult.skipped > 0 && <p>{importResult.skipped} row{importResult.skipped !== 1 ? 's' : ''} skipped (duplicates or invalid).</p>}
+                  {importResult.failed > 0 && <p style={{ color: '#D92D20' }}>{importResult.failed} row{importResult.failed !== 1 ? 's' : ''} failed to save.</p>}
+                </div>
+                <div style={styles.modalFooter}>
+                  <button className="btn btn-primary" onClick={closeImport}>Done</button>
+                </div>
+              </>
+            ) : importRows.length === 0 ? (
+              <>
+                <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 16, lineHeight: 1.6 }}>
+                  Upload a CSV with columns <strong>name</strong>, <strong>email</strong>, and optionally <strong>role</strong> (defaults to learner).
+                </p>
+                <button type="button" className="btn btn-secondary" style={{ marginBottom: 16, fontSize: 13 }} onClick={downloadImportTemplate}>
+                  <i className="fa-solid fa-download" /> Download Template
+                </button>
+                <div className="form-group">
+                  <label>CSV File</label>
+                  <input type="file" accept=".csv" onChange={handleCsvFile} />
+                </div>
+                <div style={styles.modalFooter}>
+                  <button type="button" className="btn btn-secondary" onClick={closeImport}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8, marginBottom: 16 }}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>{['Name', 'Email', 'Role', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {importRows.map((r, i) => (
+                        <tr key={i} style={styles.tr}>
+                          <td style={styles.td}>{r.name || <em style={{ color: 'var(--gray-400)' }}>missing</em>}</td>
+                          <td style={styles.td}>{r.email || <em style={{ color: 'var(--gray-400)' }}>missing</em>}</td>
+                          <td style={styles.td}>{r.role}</td>
+                          <td style={styles.td}>
+                            {r.status === 'ok' && <span className="badge badge-green">Ready</span>}
+                            {r.status === 'duplicate' && <span className="badge badge-gray">Already exists</span>}
+                            {r.status === 'duplicate_in_file' && <span className="badge badge-gray">Duplicate in file</span>}
+                            {r.status === 'missing_fields' && <span className="badge badge-red">Missing name/email</span>}
+                            {r.status === 'invalid_email' && <span className="badge badge-red">Invalid email</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="form-group">
+                  <label>Enroll all imported users into a program (optional)</label>
+                  <select value={importProgramId} onChange={e => setImportProgramId(e.target.value)}>
+                    <option value="">Don't enroll</option>
+                    {programs.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  </select>
+                </div>
+                <div style={styles.modalFooter}>
+                  <button type="button" className="btn btn-secondary" onClick={closeImport}>Cancel</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={importing || importRows.filter(r => r.status === 'ok').length === 0}
+                    onClick={handleImport}
+                  >
+                    {importing ? 'Importing…' : `Import ${importRows.filter(r => r.status === 'ok').length} User${importRows.filter(r => r.status === 'ok').length !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {showBulkEnroll && (
         <div style={styles.overlay}>

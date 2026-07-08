@@ -23,6 +23,7 @@ import CourseView from './pages/learner/CourseView';
 import LessonView from './pages/learner/LessonView';
 import CourseComplete from './pages/learner/CourseComplete';
 import LearnerDashboard from './pages/learner/LearnerDashboard';
+import SearchResults from './pages/learner/SearchResults';
 import ResetPassword from './pages/learner/ResetPassword';
 
 import './index.css';
@@ -51,6 +52,7 @@ function App() {
           <Route path="/" element={<LearnerLayout />}>
             <Route index element={<MyPrograms />} />
             <Route path="dashboard" element={<LearnerDashboard />} />
+            <Route path="search" element={<SearchResults />} />
             <Route path="programs/:programId" element={<ProgramView />} />
             <Route path="courses/:courseId" element={<CourseView />} />
             <Route path="lessons/:lessonId" element={<LessonView />} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
 import { useProgress } from '../../context/ProgressContext';
 
@@ -9,8 +9,6 @@ export default function MyPrograms() {
   const [continueInfo, setContinueInfo] = useState(null);
   const { fetchProgress } = useProgress();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const search = searchParams.get('q') || '';
 
   useEffect(() => {
     async function load() {
@@ -64,11 +62,6 @@ export default function MyPrograms() {
 
   if (loading) return <LoadingSkeleton />;
 
-  const filtered = programs.filter(p =>
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    (p.description || '').toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <div className="page-fade">
       <div style={styles.pageTop}>
@@ -76,9 +69,8 @@ export default function MyPrograms() {
           <div style={styles.eyebrow}>My Programs</div>
           <h1 style={styles.heading}>Welcome back, {JSON.parse(localStorage.getItem('roofu_user') || '{}').name || 'Learner'}</h1>
         </div>
-        {search && <div style={{ fontSize: 13, color: 'var(--gray-500)', alignSelf: 'flex-end' }}>Results for "<strong>{search}</strong>"</div>}
       </div>
-      {!search && continueInfo && (
+      {continueInfo && (
         <div className="card" style={styles.continueCard} onClick={() => navigate(`/lessons/${continueInfo.lessonId}`)}>
           <div style={styles.continueIcon}><i className="fa-solid fa-play" /></div>
           <div style={{ flex: 1 }}>
@@ -92,9 +84,7 @@ export default function MyPrograms() {
           </button>
         </div>
       )}
-      {filtered.length === 0 && search ? (
-        <div className="card empty-state"><p>No programs match "{search}".</p></div>
-      ) : filtered.length === 0 ? (
+      {programs.length === 0 ? (
         <div className="card" style={{ padding: '48px 32px', textAlign: 'center' }}>
           <i className="fa-solid fa-graduation-cap" style={{ fontSize: 36, color: 'var(--gray-300)', marginBottom: 16, display: 'block' }} />
           <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 8 }}>You're not enrolled in any programs yet.</h2>
@@ -102,7 +92,7 @@ export default function MyPrograms() {
         </div>
       ) : (
         <div style={styles.grid}>
-          {filtered.map(prog => {
+          {programs.map(prog => {
             const courses = (prog.program_courses || [])
               .sort((a, b) => a.order - b.order)
               .map(pc => pc.courses)

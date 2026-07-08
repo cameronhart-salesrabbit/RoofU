@@ -71,13 +71,13 @@ export default function LearnerLayout() {
           <NavLink to="/dashboard" style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.navLinkActive : {}) })}>Progress</NavLink>
         </nav>
         {!isLessonView && (
-          <form onSubmit={e => { e.preventDefault(); if (searchVal.trim()) { navigate(`/?q=${encodeURIComponent(searchVal.trim())}`); searchRef.current?.blur(); } }} style={{ display: 'flex', alignItems: 'center' }}>
+          <form onSubmit={e => { e.preventDefault(); if (searchVal.trim()) { navigate(`/search?q=${encodeURIComponent(searchVal.trim())}`); searchRef.current?.blur(); } }} style={{ display: 'flex', alignItems: 'center' }}>
             <div style={styles.searchWrap}>
               <i className="fa-solid fa-magnifying-glass" style={styles.searchIcon} />
               <input
                 ref={searchRef}
                 type="search"
-                placeholder="Search programs…"
+                placeholder="Search programs, courses, lessons…"
                 value={searchVal}
                 onChange={e => setSearchVal(e.target.value)}
                 style={styles.searchInput}

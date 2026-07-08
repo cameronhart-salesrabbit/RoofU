@@ -326,12 +326,15 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
       ...lessonForm,
       duration_minutes: lessonForm.duration_minutes ? Number(lessonForm.duration_minutes) : null,
     };
-    if (editingLesson) {
-      await supabase.from('lessons').update({ ...payload, updated_at: new Date() }).eq('id', editingLesson.id);
-    } else {
-      await supabase.from('lessons').insert({ ...payload, section_id: section.id, order: lessons.length });
-    }
+    const { error } = editingLesson
+      ? await supabase.from('lessons').update({ ...payload, updated_at: new Date() }).eq('id', editingLesson.id)
+      : await supabase.from('lessons').insert({ ...payload, section_id: section.id, order: lessons.length });
     setSaving(false);
+    if (error) {
+      console.error('saveLesson failed', error);
+      alert(`Couldn't save lesson: ${error.message}`);
+      return;
+    }
     setShowLessonForm(false);
     const { data } = await supabase.from('lessons').select('*').eq('section_id', section.id).order('order');
     setLessons(data || []);
@@ -365,7 +368,10 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
     setUploadingPdf(true);
     const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const { error } = await supabase.storage.from('lesson-attachments').upload(path, file);
-    if (!error) {
+    if (error) {
+      console.error('PDF upload failed', error);
+      alert(`Couldn't upload PDF: ${error.message}`);
+    } else {
       const { data: { publicUrl } } = supabase.storage.from('lesson-attachments').getPublicUrl(path);
       setLessonForm(f => ({ ...f, attachment_url: publicUrl, attachment_name: file.name }));
     }
