@@ -19,6 +19,7 @@ create table courses (
   description text,
   product text not null default 'SalesRabbit',
   quiz_id uuid,
+  is_published boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -49,6 +50,9 @@ create table lessons (
   video_url text,
   written_content text,
   quiz_id uuid,
+  duration_minutes integer,
+  attachment_url text,
+  attachment_name text,
   "order" integer default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -60,7 +64,9 @@ create table quizzes (
   title text not null,
   attached_to_id uuid,
   attached_to_type text check (attached_to_type in ('lesson', 'section', 'course')),
-  pass_threshold integer default 80
+  pass_threshold integer default 80,
+  max_retakes integer,
+  show_correct_answers boolean default false
 );
 
 -- Quiz Questions
@@ -98,6 +104,7 @@ create table progress (
   completed_lesson_ids jsonb default '[]',
   completed_section_ids jsonb default '[]',
   course_completed boolean default false,
+  last_lesson_id uuid references lessons(id) on delete set null,
   last_updated timestamptz default now(),
   unique(user_id, course_id)
 );

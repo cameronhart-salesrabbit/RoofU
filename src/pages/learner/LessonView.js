@@ -34,7 +34,7 @@ export default function LessonView() {
   const [marking, setMarking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const { learnerId, progress, fetchProgress, markLessonComplete, isLessonComplete } = useProgress();
+  const { learnerId, progress, fetchProgress, markLessonComplete, recordLastVisited, isLessonComplete } = useProgress();
 
   const loadLesson = useCallback(async (id) => {
     setLoading(true);
@@ -53,6 +53,7 @@ export default function LessonView() {
       const { data: c } = await supabase.from('courses').select('*').eq('id', sec.course_id).single();
       setCourse(c);
       await fetchProgress(sec.course_id);
+      recordLastVisited(sec.course_id, l.id);
 
       // Build flat ordered lesson list for this course
       const { data: secs } = await supabase.from('sections').select('*, lessons(*)').eq('course_id', sec.course_id).order('order');
@@ -94,7 +95,7 @@ export default function LessonView() {
     }
 
     setLoading(false);
-  }, [fetchProgress, learnerId]);
+  }, [fetchProgress, recordLastVisited, learnerId]);
 
   useEffect(() => { loadLesson(lessonId); }, [lessonId, loadLesson]);
 

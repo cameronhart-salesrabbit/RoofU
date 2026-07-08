@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin/users', label: 'Users', icon: 'fa-solid fa-users' },
   { to: '/admin/progress', label: 'Progress', icon: 'fa-solid fa-chart-bar' },
   { to: '/admin/completion', label: 'Completion', icon: 'fa-solid fa-circle-check' },
+  { to: '/admin/quiz-analytics', label: 'Quiz Analytics', icon: 'fa-solid fa-clipboard-question' },
 ];
 
 export default function AdminLayout() {

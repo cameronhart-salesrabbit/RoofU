@@ -13,6 +13,7 @@ import QuizBuilder from './pages/admin/QuizBuilder';
 import UserManager from './pages/admin/UserManager';
 import ProgressReport from './pages/admin/ProgressReport';
 import CompletionReport from './pages/admin/CompletionReport';
+import QuizAnalytics from './pages/admin/QuizAnalytics';
 
 // Learner pages
 import LearnerLayout from './pages/learner/LearnerLayout';
@@ -43,6 +44,7 @@ function App() {
             <Route path="users" element={<UserManager />} />
             <Route path="progress" element={<ProgressReport />} />
             <Route path="completion" element={<CompletionReport />} />
+            <Route path="quiz-analytics" element={<QuizAnalytics />} />
           </Route>
 
           {/* Learner routes */}

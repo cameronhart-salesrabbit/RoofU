@@ -85,7 +85,12 @@ export default function CourseBuilder() {
 
   async function togglePublish() {
     const newVal = !selected.is_published;
-    await supabase.from('courses').update({ is_published: newVal }).eq('id', selected.id);
+    const { error } = await supabase.from('courses').update({ is_published: newVal }).eq('id', selected.id);
+    if (error) {
+      console.error('togglePublish failed', error);
+      alert(`Couldn't update publish status: ${error.message}`);
+      return;
+    }
     setSelected(s => ({ ...s, is_published: newVal }));
     setCourses(cs => cs.map(c => c.id === selected.id ? { ...c, is_published: newVal } : c));
   }

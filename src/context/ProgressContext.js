@@ -63,6 +63,22 @@ export function ProgressProvider({ children }) {
     if (data) setProgress(p => ({ ...p, [courseId]: data }));
   }, [learnerId, progress]);
 
+  const recordLastVisited = useCallback(async (courseId, lessonId) => {
+    if (!learnerId) return;
+    const { data } = await supabase
+      .from('progress')
+      .upsert({
+        user_id: learnerId,
+        course_id: courseId,
+        last_lesson_id: lessonId,
+        last_updated: new Date(),
+      }, { onConflict: 'user_id,course_id' })
+      .select()
+      .single();
+
+    if (data) setProgress(p => ({ ...p, [courseId]: data }));
+  }, [learnerId]);
+
   const isLessonComplete = useCallback((courseId, lessonId) => {
     return (progress[courseId]?.completed_lesson_ids || []).includes(lessonId);
   }, [progress]);
@@ -74,7 +90,7 @@ export function ProgressProvider({ children }) {
   }, [progress]);
 
   return (
-    <ProgressContext.Provider value={{ learnerId, progress, fetchProgress, markLessonComplete, isLessonComplete, getCourseProgress }}>
+    <ProgressContext.Provider value={{ learnerId, progress, fetchProgress, markLessonComplete, recordLastVisited, isLessonComplete, getCourseProgress }}>
       {children}
     </ProgressContext.Provider>
   );
