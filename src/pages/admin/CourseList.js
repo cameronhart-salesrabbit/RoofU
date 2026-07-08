@@ -7,8 +7,10 @@ const PRODUCTS = ['SalesRabbit', 'SalesRabbit+', 'RoofLink', 'Roofle', 'Roofing 
 export default function CourseList() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [programFilter, setProgramFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', product: PRODUCTS[0] });
@@ -18,11 +20,12 @@ export default function CourseList() {
 
   async function fetchCourses() {
     setLoading(true);
-    const { data } = await supabase
-      .from('courses')
-      .select('*, sections(id, lessons(id))')
-      .order('created_at', { ascending: false });
-    setCourses(data || []);
+    const [{ data: c }, { data: p }] = await Promise.all([
+      supabase.from('courses').select('*, sections(id, lessons(id)), program_courses(program_id, programs(id, title))').order('created_at', { ascending: false }),
+      supabase.from('programs').select('id, title').order('title'),
+    ]);
+    setCourses(c || []);
+    setPrograms(p || []);
     setLoading(false);
   }
 
@@ -62,16 +65,27 @@ export default function CourseList() {
     fetchCourses();
   }
 
-  const filtered = courses.filter(c =>
-    c.title.toLowerCase().includes(search.toLowerCase()) ||
-    (c.product || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = courses.filter(c => {
+    const matchesSearch =
+      c.title.toLowerCase().includes(search.toLowerCase()) ||
+      (c.product || '').toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    const programIds = (c.program_courses || []).map(pc => pc.program_id);
+    if (programFilter === 'all') return true;
+    if (programFilter === 'unassigned') return programIds.length === 0;
+    return programIds.includes(programFilter);
+  });
 
   return (
     <div>
       <div className="page-header">
         <h1>Courses</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <select value={programFilter} onChange={e => setProgramFilter(e.target.value)} style={styles.programFilter}>
+            <option value="all">All Programs</option>
+            <option value="unassigned">Unassigned</option>
+            {programs.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </select>
           <input
             type="search"
             placeholder="Search courses…"
@@ -115,12 +129,13 @@ export default function CourseList() {
         courses.length === 0 ? (
           <div className="card empty-state"><p>No courses yet. Create your first course to get started.</p></div>
         ) : filtered.length === 0 ? (
-          <div className="card empty-state"><p>No courses match "{search}".</p></div>
+          <div className="card empty-state"><p>No courses match the current search/filter.</p></div>
         ) : (
           <div style={styles.list}>
             {filtered.map(course => {
               const sectionCount = (course.sections || []).length;
               const lessonCount = (course.sections || []).reduce((sum, s) => sum + (s.lessons || []).length, 0);
+              const courseProgramNames = (course.program_courses || []).map(pc => pc.programs?.title).filter(Boolean);
               return (
                 <div key={course.id} className="card" style={styles.row} onClick={() => navigate(`/admin/courses/${course.id}`)}>
                   <div style={styles.rowInfo}>
@@ -129,7 +144,11 @@ export default function CourseList() {
                       {!course.is_published && <span className="badge" style={{ fontSize: 11, background: '#FEF7F2', color: 'var(--red)' }}>Draft</span>}
                     </div>
                     {course.description && <p style={styles.rowDesc}>{course.description}</p>}
-                    <span style={styles.rowMeta}>{sectionCount} section{sectionCount !== 1 ? 's' : ''} · {lessonCount} lesson{lessonCount !== 1 ? 's' : ''}</span>
+                    <span style={styles.rowMeta}>
+                      {sectionCount} section{sectionCount !== 1 ? 's' : ''} · {lessonCount} lesson{lessonCount !== 1 ? 's' : ''}
+                      {' · '}
+                      {courseProgramNames.length > 0 ? courseProgramNames.join(', ') : 'Unassigned'}
+                    </span>
                   </div>
                   <span className="badge badge-gray">{course.product}</span>
                   <div style={styles.rowActions} onClick={e => e.stopPropagation()}>
@@ -149,6 +168,7 @@ export default function CourseList() {
 
 const styles = {
   searchInput: { padding: '8px 12px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', width: 220 },
+  programFilter: { padding: '8px 12px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', width: 160 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 },
   modal: { width: '100%', maxWidth: 540, padding: 28, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 20 },
