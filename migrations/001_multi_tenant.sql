@@ -21,6 +21,14 @@ create table if not exists public.clients (
   created_at timestamptz default now()
 );
 
+-- A brand-new table does NOT inherit the blanket GRANT ALL previously run
+-- against the tables that existed at the time - that grant only applies to
+-- tables that existed when it ran. Without this, RLS policies are moot: the
+-- role has no base table privilege to even attempt the query, so every
+-- query against clients silently returns nothing.
+grant all on public.clients to anon;
+grant all on public.clients to authenticated;
+
 -- =========================================================================
 -- 2. client_id column on every existing table (nullable for now)
 -- =========================================================================
