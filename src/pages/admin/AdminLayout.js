@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { supabase } from '../../supabase/client';
@@ -38,10 +38,6 @@ export default function AdminLayout() {
   if (loading) return null;
   if (!isAdmin) return null;
 
-  const nav = isSuperAdmin
-    ? [...BASE_NAV, { to: '/admin/clients', label: 'Clients', icon: 'fa-solid fa-building' }]
-    : BASE_NAV;
-
   return (
     <div style={styles.shell} className="admin-shell">
       <aside style={styles.sidebar} className="admin-sidebar">
@@ -51,20 +47,20 @@ export default function AdminLayout() {
         </div>
 
         {isSuperAdmin && (
-          <div style={styles.clientSwitcher}>
-            <div style={styles.clientSwitcherLabel}>Managing</div>
-            <select
-              value={selectedClientId || ''}
-              onChange={e => setSelectedClientId(e.target.value)}
-              style={styles.clientSelect}
+          <div style={styles.clientSwitcherWrap}>
+            <ClientSwitcher clients={clients} selectedClientId={selectedClientId} onSelect={setSelectedClientId} />
+            <NavLink
+              to="/admin/clients"
+              style={({ isActive }) => ({ ...styles.clientsLink, ...(isActive ? styles.navLinkActive : {}) })}
             >
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              <i className="fa-solid fa-building" style={styles.navIcon} />
+              Clients
+            </NavLink>
           </div>
         )}
 
         <nav style={styles.nav} className="admin-nav">
-          {nav.map(({ to, label, icon, end }) => (
+          {BASE_NAV.map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -96,6 +92,59 @@ export default function AdminLayout() {
       <main style={styles.main} className="admin-main">
         <Outlet />
       </main>
+    </div>
+  );
+}
+
+function ClientSwitcher({ clients, selectedClientId, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = clients.find(c => c.id === selectedClientId);
+  const filtered = clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div ref={ref} style={styles.clientSwitcher}>
+      <div style={styles.clientSwitcherLabel}>Managing</div>
+      <button type="button" onClick={() => setOpen(o => !o)} style={styles.clientSwitcherBtn}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected?.name || 'Select client…'}</span>
+        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 10, flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div style={styles.clientDropdown}>
+          <input
+            autoFocus
+            type="search"
+            placeholder="Search clients…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={styles.clientSearchInput}
+          />
+          <div style={styles.clientOptionList}>
+            {filtered.length === 0 ? (
+              <div style={styles.clientOptionEmpty}>No matches</div>
+            ) : filtered.map(c => (
+              <div
+                key={c.id}
+                onClick={() => { onSelect(c.id); setOpen(false); setSearch(''); }}
+                style={{ ...styles.clientOption, ...(c.id === selectedClientId ? styles.clientOptionActive : {}) }}
+              >
+                {c.name}
+                {c.id === selectedClientId && <i className="fa-solid fa-check" style={{ fontSize: 11 }} />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -143,10 +192,14 @@ const styles = {
     borderRadius: '999px',
     letterSpacing: '0.5px',
   },
-  clientSwitcher: {
-    padding: '0 20px 16px',
+  clientSwitcherWrap: {
+    padding: '0 20px 12px',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
     marginBottom: '8px',
+  },
+  clientSwitcher: {
+    position: 'relative',
+    marginBottom: 8,
   },
   clientSwitcherLabel: {
     fontSize: '10px',
@@ -156,14 +209,78 @@ const styles = {
     color: 'rgba(255,255,255,0.4)',
     marginBottom: '6px',
   },
-  clientSelect: {
+  clientSwitcherBtn: {
     width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     padding: '7px 8px',
     fontSize: '13px',
     borderRadius: '7px',
     border: '1px solid rgba(255,255,255,0.15)',
     background: 'rgba(255,255,255,0.06)',
     color: 'var(--white)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  clientDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 4px)',
+    left: 0,
+    right: 0,
+    background: 'var(--gray-900)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 8,
+    boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+    zIndex: 30,
+    overflow: 'hidden',
+  },
+  clientSearchInput: {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '8px 10px',
+    fontSize: 13,
+    border: 'none',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.04)',
+    color: 'var(--white)',
+    outline: 'none',
+  },
+  clientOptionList: {
+    maxHeight: 220,
+    overflowY: 'auto',
+    padding: 4,
+  },
+  clientOption: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: '7px 10px',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)',
+    borderRadius: 6,
+    cursor: 'pointer',
+  },
+  clientOptionActive: {
+    background: 'rgba(244,97,0,0.15)',
+    color: '#F46100',
+  },
+  clientOptionEmpty: {
+    padding: '10px',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  clientsLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '8px 10px',
+    borderRadius: '7px',
+    fontSize: '13px',
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
   },
   nav: {
     flex: 1,
