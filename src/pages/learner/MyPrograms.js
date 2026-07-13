@@ -7,14 +7,20 @@ export default function MyPrograms() {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [continueInfo, setContinueInfo] = useState(null);
-  const { fetchProgress } = useProgress();
+  const { fetchProgress, learnerId } = useProgress();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!learnerId) return;
     async function load() {
+      const { data: enrollments } = await supabase.from('user_program_enrollments').select('program_id').eq('user_id', learnerId);
+      const enrolledIds = (enrollments || []).map(e => e.program_id);
+      if (enrolledIds.length === 0) { setPrograms([]); setLoading(false); return; }
+
       const { data } = await supabase
         .from('programs')
         .select('*, program_courses(course_id, order, courses(id, title, product, is_published, sections(*, lessons(*))))')
+        .in('id', enrolledIds)
         .order('created_at', { ascending: false });
 
       const progs = data || [];
@@ -58,7 +64,7 @@ export default function MyPrograms() {
       }
     }
     load();
-  }, [fetchProgress]);
+  }, [fetchProgress, learnerId]);
 
   if (loading) return <LoadingSkeleton />;
 

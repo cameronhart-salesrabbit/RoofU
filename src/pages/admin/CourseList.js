@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
-
-const PRODUCTS = ['SalesRabbit', 'SalesRabbit+', 'RoofLink', 'Roofle', 'Roofing General'];
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 export default function CourseList() {
+  const { effectiveClientId } = useAdminAuth();
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -13,16 +13,18 @@ export default function CourseList() {
   const [programFilter, setProgramFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', product: PRODUCTS[0] });
+  const [form, setForm] = useState({ title: '', description: '', product: '' });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchCourses(); }, []);
+  const productSuggestions = [...new Set(courses.map(c => c.product).filter(Boolean))];
+
+  useEffect(() => { if (effectiveClientId) fetchCourses(); }, [effectiveClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchCourses() {
     setLoading(true);
     const [{ data: c }, { data: p }] = await Promise.all([
-      supabase.from('courses').select('*, sections(id, lessons(id)), program_courses(program_id, programs(id, title))').order('created_at', { ascending: false }),
-      supabase.from('programs').select('id, title').order('title'),
+      supabase.from('courses').select('*, sections(id, lessons(id)), program_courses(program_id, programs(id, title))').eq('client_id', effectiveClientId).order('created_at', { ascending: false }),
+      supabase.from('programs').select('id, title').eq('client_id', effectiveClientId).order('title'),
     ]);
     setCourses(c || []);
     setPrograms(p || []);
@@ -31,7 +33,7 @@ export default function CourseList() {
 
   function openNew() {
     setEditing(null);
-    setForm({ title: '', description: '', product: PRODUCTS[0] });
+    setForm({ title: '', description: '', product: productSuggestions[0] || '' });
     setShowForm(true);
   }
 
@@ -51,7 +53,7 @@ export default function CourseList() {
       setShowForm(false);
       fetchCourses();
     } else {
-      const { data, error } = await supabase.from('courses').insert(form).select().single();
+      const { data, error } = await supabase.from('courses').insert({ ...form, client_id: effectiveClientId }).select().single();
       setSaving(false);
       if (error || !data) { console.error('createCourse failed', error); alert(`Couldn't create course: ${error?.message || 'unknown error'}`); return; }
       setShowForm(false);
@@ -108,9 +110,15 @@ export default function CourseList() {
               </div>
               <div className="form-group">
                 <label>Product</label>
-                <select value={form.product} onChange={e => setForm(f => ({ ...f, product: e.target.value }))}>
-                  {PRODUCTS.map(p => <option key={p}>{p}</option>)}
-                </select>
+                <input
+                  list="product-suggestions"
+                  value={form.product}
+                  onChange={e => setForm(f => ({ ...f, product: e.target.value }))}
+                  placeholder="e.g. Core Onboarding"
+                />
+                <datalist id="product-suggestions">
+                  {productSuggestions.map(p => <option key={p} value={p} />)}
+                </datalist>
               </div>
               <div className="form-group">
                 <label>Description</label>

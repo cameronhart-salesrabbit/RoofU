@@ -13,6 +13,7 @@ import CourseList from './pages/admin/CourseList';
 import CourseBuilder from './pages/admin/CourseBuilder';
 import QuizBuilder from './pages/admin/QuizBuilder';
 import UserManager from './pages/admin/UserManager';
+import ClientsList from './pages/admin/ClientsList';
 import ProgressReport from './pages/admin/ProgressReport';
 import CompletionReport from './pages/admin/CompletionReport';
 import QuizAnalytics from './pages/admin/QuizAnalytics';
@@ -52,6 +53,7 @@ function App() {
             <Route path="courses/:courseId" element={<CourseBuilder />} />
             <Route path="quizzes/:quizId" element={<QuizBuilder />} />
             <Route path="users" element={<UserManager />} />
+            <Route path="clients" element={<ClientsList />} />
           </Route>
 
           {/* Learner routes */}

@@ -6,7 +6,7 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { supabase } from '../supabase/client';
 
-export default function RichTextEditor({ value, onChange }) {
+export default function RichTextEditor({ value, onChange, clientId }) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -23,7 +23,7 @@ export default function RichTextEditor({ value, onChange }) {
     if (!file || !editor) return;
 
     const ext = file.name.split('.').pop();
-    const path = `lesson-images/${Date.now()}.${ext}`;
+    const path = `${clientId}/lesson-images/${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage.from('lesson-content').upload(path, file, { upsert: true });
     if (error) { alert('Image upload failed: ' + error.message); return; }
@@ -31,7 +31,7 @@ export default function RichTextEditor({ value, onChange }) {
     const { data } = supabase.storage.from('lesson-content').getPublicUrl(path);
     editor.chain().focus().setImage({ src: data.publicUrl }).run();
     e.target.value = '';
-  }, [editor]);
+  }, [editor, clientId]);
 
   if (!editor) return null;
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 function parseCsvLine(line) {
   const result = [];
@@ -38,8 +39,10 @@ function parseCsv(text) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function UserManager() {
+  const { effectiveClientId } = useAdminAuth();
   const [users, setUsers] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -56,16 +59,18 @@ export default function UserManager() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
-  useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (effectiveClientId) fetchAll(); }, [effectiveClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchAll() {
     setLoading(true);
-    const [{ data: u }, { data: p }] = await Promise.all([
-      supabase.from('users').select('*, user_program_enrollments(program_id, programs(id, title))').order('created_at', { ascending: false }),
-      supabase.from('programs').select('id, title').order('title'),
+    const [{ data: u }, { data: p }, { data: c }] = await Promise.all([
+      supabase.from('users').select('*, user_program_enrollments(program_id, programs(id, title))').eq('client_id', effectiveClientId).order('created_at', { ascending: false }),
+      supabase.from('programs').select('id, title').eq('client_id', effectiveClientId).order('title'),
+      supabase.from('clients').select('name').eq('id', effectiveClientId).single(),
     ]);
     setUsers(u || []);
     setPrograms(p || []);
+    setClientName(c?.name || 'RoofU');
     // Keep detailUser in sync if open
     if (detailUser) {
       const updated = (u || []).find(x => x.id === detailUser.id);
@@ -104,7 +109,7 @@ export default function UserManager() {
             to_name: name,
             to_email: email,
             login_url: `${window.location.origin}/?signup=1`,
-            message: `You've been added to RoofU. Create your account at the link below using this email address: ${email}`,
+            message: `You've been added to ${clientName}. Create your account at the link below using this email address: ${email}`,
           },
         }),
       });
@@ -119,7 +124,7 @@ export default function UserManager() {
     if (editing) {
       await supabase.from('users').update({ name: form.name, email: form.email, role: form.role }).eq('id', editing.id);
     } else {
-      const { data } = await supabase.from('users').insert({ name: form.name, email: form.email, role: form.role }).select().single();
+      const { data } = await supabase.from('users').insert({ name: form.name, email: form.email, role: form.role, client_id: effectiveClientId }).select().single();
       userId = data?.id;
       isNew = true;
     }
@@ -258,7 +263,7 @@ export default function UserManager() {
     let created = 0, failed = 0;
     const newUserIds = [];
     for (const row of toImport) {
-      const { data, error } = await supabase.from('users').insert({ name: row.name, email: row.email, role: row.role }).select().single();
+      const { data, error } = await supabase.from('users').insert({ name: row.name, email: row.email, role: row.role, client_id: effectiveClientId }).select().single();
       if (error || !data) { failed++; console.error('CSV import failed for', row.email, error); continue; }
       created++;
       newUserIds.push(data.id);

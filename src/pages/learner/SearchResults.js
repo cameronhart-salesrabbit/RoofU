@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
+import { useProgress } from '../../context/ProgressContext';
 
 function stripHtml(html) {
   return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -10,20 +11,27 @@ export default function SearchResults() {
   const [searchParams] = useSearchParams();
   const query = (searchParams.get('q') || '').trim();
   const navigate = useNavigate();
+  const { learnerId } = useProgress();
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!learnerId) return;
     async function load() {
+      const { data: enrollments } = await supabase.from('user_program_enrollments').select('program_id').eq('user_id', learnerId);
+      const enrolledIds = (enrollments || []).map(e => e.program_id);
+      if (enrolledIds.length === 0) { setPrograms([]); setLoading(false); return; }
+
       const { data } = await supabase
         .from('programs')
         .select('*, program_courses(order, courses(id, title, description, product, is_published, sections(id, title, lessons(id, title, video_type, written_content))))')
+        .in('id', enrolledIds)
         .order('created_at', { ascending: false });
       setPrograms(data || []);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [learnerId]);
 
   if (loading) return <p style={{ color: 'var(--gray-400)', padding: 32 }}>Searching…</p>;
 

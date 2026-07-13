@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 export default function CompletionReport() {
+  const { effectiveClientId } = useAdminAuth();
   const [courses, setCourses] = useState([]);
   const [users, setUsers] = useState([]);
   const [progress, setProgress] = useState([]);
@@ -9,11 +11,12 @@ export default function CompletionReport() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!effectiveClientId) return;
     async function load() {
       const [{ data: c }, { data: u }, { data: p }] = await Promise.all([
-        supabase.from('courses').select('*, sections(*, lessons(*))').order('title'),
-        supabase.from('users').select('*').eq('role', 'learner').order('name'),
-        supabase.from('progress').select('*'),
+        supabase.from('courses').select('*, sections(*, lessons(*))').eq('client_id', effectiveClientId).order('title'),
+        supabase.from('users').select('*').eq('client_id', effectiveClientId).eq('role', 'learner').order('name'),
+        supabase.from('progress').select('*').eq('client_id', effectiveClientId),
       ]);
       setCourses(c || []);
       setUsers(u || []);
@@ -21,7 +24,7 @@ export default function CompletionReport() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [effectiveClientId]);
 
   function getTotalLessons(course) {
     return (course.sections || []).reduce((sum, s) => sum + (s.lessons || []).length, 0);

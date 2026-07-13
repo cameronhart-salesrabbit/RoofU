@@ -14,9 +14,13 @@ export default function LearnerDashboard() {
 
   useEffect(() => {
     async function load() {
+      const { data: enrollments } = await supabase.from('user_program_enrollments').select('program_id').eq('user_id', user.id);
+      const enrolledIds = (enrollments || []).map(e => e.program_id);
+
       const [{ data: progs }, { data: progress }, { data: qr }] = await Promise.all([
-        supabase.from('programs')
+        enrolledIds.length === 0 ? Promise.resolve({ data: [] }) : supabase.from('programs')
           .select('*, program_courses(order, courses(id, title, product, sections(*, lessons(*))))')
+          .in('id', enrolledIds)
           .order('created_at', { ascending: false }),
         supabase.from('progress').select('*').eq('user_id', user.id),
         supabase.from('quiz_results').select('*').eq('user_id', user.id),

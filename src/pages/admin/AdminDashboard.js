@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
-const PRODUCTS = ['SalesRabbit', 'SalesRabbit+', 'RoofLink', 'Roofle', 'Roofing General'];
-const PRODUCT_COLORS = {
-  'SalesRabbit': '#F46100',
-  'SalesRabbit+': '#688393',
-  'RoofLink': '#688393',
-  'Roofle': '#6A7A56',
-  'Roofing General': '#9AB485',
-};
+// Generic palette for an arbitrary, per-client set of product/category names
+// (no longer a fixed SalesRabbit-specific list) - assigned by position, not name.
+const PALETTE = ['#F46100', '#688393', '#6A7A56', '#9AB485', '#C34E00', '#3C3489', '#D4537E', '#185FA5'];
 
 export default function AdminDashboard() {
+  const { effectiveClientId } = useAdminAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({ programs: 0, courses: 0, users: 0, lessons: 0, quizzes: 0 });
   const [coursesByProduct, setCoursesByProduct] = useState([]);
@@ -19,6 +16,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!effectiveClientId) return;
     async function fetchStats() {
       const [
         { count: programs },
@@ -29,26 +27,31 @@ export default function AdminDashboard() {
         { data: allCourses },
         { data: recent },
       ] = await Promise.all([
-        supabase.from('programs').select('*', { count: 'exact', head: true }),
-        supabase.from('courses').select('*', { count: 'exact', head: true }),
-        supabase.from('users').select('*', { count: 'exact', head: true }),
-        supabase.from('lessons').select('*', { count: 'exact', head: true }),
-        supabase.from('quizzes').select('*', { count: 'exact', head: true }),
-        supabase.from('courses').select('product'),
-        supabase.from('courses').select('id, title, product, created_at').order('created_at', { ascending: false }).limit(5),
+        supabase.from('programs').select('*', { count: 'exact', head: true }).eq('client_id', effectiveClientId),
+        supabase.from('courses').select('*', { count: 'exact', head: true }).eq('client_id', effectiveClientId),
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('client_id', effectiveClientId),
+        supabase.from('lessons').select('*', { count: 'exact', head: true }).eq('client_id', effectiveClientId),
+        supabase.from('quizzes').select('*', { count: 'exact', head: true }).eq('client_id', effectiveClientId),
+        supabase.from('courses').select('product').eq('client_id', effectiveClientId),
+        supabase.from('courses').select('id, title, product, created_at').eq('client_id', effectiveClientId).order('created_at', { ascending: false }).limit(5),
       ]);
 
       setStats({ programs: programs || 0, courses: courses || 0, users: users || 0, lessons: lessons || 0, quizzes: quizzes || 0 });
 
-      // Tally courses per product
+      // Tally courses per product (product names are per-client free text now)
       const tally = {};
       (allCourses || []).forEach(c => { tally[c.product] = (tally[c.product] || 0) + 1; });
-      setCoursesByProduct(PRODUCTS.map(p => ({ product: p, count: tally[p] || 0 })).filter(p => p.count > 0));
+      setCoursesByProduct(Object.entries(tally).map(([product, count]) => ({ product, count })).sort((a, b) => b.count - a.count));
       setRecentCourses(recent || []);
       setLoading(false);
     }
     fetchStats();
-  }, []);
+  }, [effectiveClientId]);
+
+  const productColor = product => {
+    const i = coursesByProduct.findIndex(p => p.product === product);
+    return PALETTE[(i >= 0 ? i : 0) % PALETTE.length];
+  };
 
   const statCards = [
     { label: 'Programs', value: stats.programs, path: '/admin/programs' },
@@ -91,7 +94,7 @@ export default function AdminDashboard() {
                     <div key={product} style={styles.barRow}>
                       <span style={styles.barLabel}>{product}</span>
                       <div style={styles.barTrack}>
-                        <div style={{ ...styles.barFill, width: `${pct}%`, background: PRODUCT_COLORS[product] || 'var(--red)' }} />
+                        <div style={{ ...styles.barFill, width: `${pct}%`, background: productColor(product) }} />
                       </div>
                       <span style={styles.barCount}>{count}</span>
                     </div>
@@ -115,7 +118,7 @@ export default function AdminDashboard() {
               <div style={styles.recentList}>
                 {recentCourses.map(c => (
                   <div key={c.id} style={styles.recentRow} onClick={() => navigate(`/admin/courses/${c.id}`)}>
-                    <div style={{ ...styles.recentDot, background: PRODUCT_COLORS[c.product] || 'var(--gray-300)' }} />
+                    <div style={{ ...styles.recentDot, background: productColor(c.product) }} />
                     <div style={styles.recentInfo}>
                       <span style={styles.recentTitle}>{c.title}</span>
                       <span style={styles.recentMeta}>{c.product}</span>

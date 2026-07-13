@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 export default function QuizAnalytics() {
+  const { effectiveClientId } = useAdminAuth();
   const [quizzes, setQuizzes] = useState([]);
   const [quizResults, setQuizResults] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -11,13 +13,14 @@ export default function QuizAnalytics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!effectiveClientId) return;
     async function load() {
       const [{ data: qz }, { data: qr }, { data: l }, { data: s }, { data: c }] = await Promise.all([
-        supabase.from('quizzes').select('*').order('title'),
-        supabase.from('quiz_results').select('*, users(name, email)').order('completed_at', { ascending: false }),
-        supabase.from('lessons').select('id, title'),
-        supabase.from('sections').select('id, title'),
-        supabase.from('courses').select('id, title'),
+        supabase.from('quizzes').select('*').eq('client_id', effectiveClientId).order('title'),
+        supabase.from('quiz_results').select('*, users(name, email)').eq('client_id', effectiveClientId).order('completed_at', { ascending: false }),
+        supabase.from('lessons').select('id, title').eq('client_id', effectiveClientId),
+        supabase.from('sections').select('id, title').eq('client_id', effectiveClientId),
+        supabase.from('courses').select('id, title').eq('client_id', effectiveClientId),
       ]);
       setQuizzes(qz || []);
       setQuizResults(qr || []);
@@ -27,7 +30,7 @@ export default function QuizAnalytics() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [effectiveClientId]);
 
   function getAttachedTitle(quiz) {
     const list = quiz.attached_to_type === 'lesson' ? lessons : quiz.attached_to_type === 'section' ? sections : courses;

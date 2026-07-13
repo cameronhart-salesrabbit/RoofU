@@ -9,7 +9,7 @@ export function ProgressProvider({ children }) {
 
   // Reactively track the logged-in learner's users.id (not auth.users.id)
   useEffect(() => {
-    async function resolveId(authUserId, authEmail) {
+    async function resolveId(authUserId) {
       if (!authUserId) { setLearnerId(null); return; }
       const { data } = await supabase
         .from('users')
@@ -18,24 +18,21 @@ export function ProgressProvider({ children }) {
         .single();
       if (data) { setLearnerId(data.id); return; }
 
-      // Fallback in case the DB auto-link trigger missed this signup: link by email instead.
-      if (authEmail) {
-        const { data: byEmail } = await supabase.from('users').select('id').ilike('email', authEmail).is('auth_id', null).single();
-        if (byEmail) {
-          await supabase.from('users').update({ auth_id: authUserId }).eq('id', byEmail.id);
-          setLearnerId(byEmail.id);
-          return;
-        }
-      }
-      setLearnerId(null);
+      // Fallback in case the DB auto-link trigger missed this signup: claim a
+      // pending invited row by email via a server-side function (RLS blocks a
+      // raw client-side lookup/update here since this session's own client_id
+      // doesn't resolve until it's linked to a row).
+      const { data: claimed, error } = await supabase.rpc('claim_pending_account');
+      if (error) console.error('claim_pending_account failed:', error);
+      setLearnerId(claimed?.id || null);
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      resolveId(data.session?.user?.id || null, data.session?.user?.email || null);
+      resolveId(data.session?.user?.id || null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      resolveId(session?.user?.id || null, session?.user?.email || null);
+      resolveId(session?.user?.id || null);
     });
 
     return () => subscription.unsubscribe();

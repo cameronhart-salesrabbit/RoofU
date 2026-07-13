@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 export default function ProgramManager() {
+  const { effectiveClientId } = useAdminAuth();
   const [programs, setPrograms] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,13 +14,13 @@ export default function ProgramManager() {
   const [search, setSearch] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { if (effectiveClientId) fetchAll(); }, [effectiveClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchAll() {
     setLoading(true);
     const [{ data: progs }, { data: crs }] = await Promise.all([
-      supabase.from('programs').select('*, program_courses(course_id, order)').order('created_at', { ascending: false }),
-      supabase.from('courses').select('id, title').order('title'),
+      supabase.from('programs').select('*, program_courses(course_id, order)').eq('client_id', effectiveClientId).order('created_at', { ascending: false }),
+      supabase.from('courses').select('id, title').eq('client_id', effectiveClientId).order('title'),
     ]);
     setPrograms(progs || []);
     setCourses(crs || []);
@@ -54,7 +56,7 @@ export default function ProgramManager() {
         );
       }
     } else {
-      const { data: newProg } = await supabase.from('programs').insert({ title: form.title, description: form.description }).select().single();
+      const { data: newProg } = await supabase.from('programs').insert({ title: form.title, description: form.description, client_id: effectiveClientId }).select().single();
       if (newProg && form.courseIds.length > 0) {
         await supabase.from('program_courses').insert(
           form.courseIds.map((cid, i) => ({ program_id: newProg.id, course_id: cid, order: i }))

@@ -13,17 +13,18 @@ export default function LearnerLayout() {
   const isLessonView = location.pathname.startsWith('/lessons/');
 
   useEffect(() => {
-    async function loadProfile(authUserId, authEmail) {
+    async function loadProfile(authUserId) {
       if (!authUserId) { setUser(null); setAuthLoading(false); return; }
       try {
         let { data, error } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
-        if (!data && authEmail) {
-          // Fallback in case the DB auto-link trigger missed this signup: link by email instead.
-          const { data: byEmail } = await supabase.from('users').select('*').ilike('email', authEmail).is('auth_id', null).single();
-          if (byEmail) {
-            const { data: linked } = await supabase.from('users').update({ auth_id: authUserId }).eq('id', byEmail.id).select().single();
-            data = linked;
-          }
+        if (!data) {
+          // Fallback in case the DB auto-link trigger missed this signup: claim
+          // a pending invited row by email via a server-side function (RLS
+          // blocks a raw client-side lookup/update here since this session's
+          // own client_id doesn't resolve until it's linked to a row).
+          const { data: claimed, error: claimErr } = await supabase.rpc('claim_pending_account');
+          if (claimErr) console.error('claim_pending_account failed:', claimErr);
+          data = claimed || null;
         } else if (error && error.code !== 'PGRST116') {
           console.error('Profile load error:', error);
         }
@@ -36,11 +37,11 @@ export default function LearnerLayout() {
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      loadProfile(data.session?.user?.id || null, data.session?.user?.email || null);
+      loadProfile(data.session?.user?.id || null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      loadProfile(session?.user?.id || null, session?.user?.email || null);
+      loadProfile(session?.user?.id || null);
     });
 
     return () => subscription.unsubscribe();
@@ -87,7 +88,7 @@ export default function LearnerLayout() {
         )}
         <div style={styles.userArea}>
           <span style={styles.userName}>{user.name}</span>
-          {user.role === 'admin' && (
+          {(user.role === 'admin' || user.role === 'super_admin') && (
             <button onClick={() => navigate('/admin')} style={styles.adminSwitchBtn}>
               <i className="fa-solid fa-shield-halved" style={{ marginRight: 6, fontSize: 11 }} />
               Admin Portal

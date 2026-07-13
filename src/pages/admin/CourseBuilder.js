@@ -55,6 +55,7 @@ export default function CourseBuilder() {
     if (!window.confirm(`Duplicate "${course.title}"? A draft copy will be created.`)) return;
     const { data: newCourse, error: courseErr } = await supabase.from('courses').insert({
       title: `${course.title} (Copy)`, description: course.description, product: course.product, is_published: false,
+      client_id: course.client_id,
     }).select().single();
     if (courseErr || !newCourse) {
       console.error('duplicateCourse: course insert failed', courseErr);
@@ -176,6 +177,7 @@ export default function CourseBuilder() {
                 onEdit={() => { setEditingSection(sec); setSectionForm({ title: sec.title }); setShowSectionForm(true); }}
                 onDelete={() => deleteSection(sec.id)}
                 onRefresh={loadCourse}
+                clientId={course.client_id}
               />
             ))}
           </SortableContext>
@@ -204,7 +206,7 @@ export default function CourseBuilder() {
   );
 }
 
-function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh }) {
+function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh, clientId }) {
   const [lessons, setLessons] = useState(section.lessons || []);
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
@@ -274,7 +276,7 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') return;
     setUploadingPdf(true);
-    const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const path = `${clientId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const { error } = await supabase.storage.from('lesson-attachments').upload(path, file);
     if (error) {
       console.error('PDF upload failed', error);
@@ -356,6 +358,7 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh 
                 <RichTextEditor
                   value={lessonForm.written_content}
                   onChange={val => setLessonForm(f => ({ ...f, written_content: val }))}
+                  clientId={clientId}
                 />
               </div>
               <div className="form-group">

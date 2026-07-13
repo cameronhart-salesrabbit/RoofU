@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import { supabase } from '../../supabase/client';
 
-const NAV = [
+const BASE_NAV = [
   { to: '/admin/analytics', label: 'Analytics', icon: 'fa-solid fa-chart-line' },
   { to: '/admin/programs', label: 'Programs', icon: 'fa-solid fa-layer-group' },
   { to: '/admin/courses', label: 'Courses', icon: 'fa-solid fa-book-open' },
@@ -10,15 +11,36 @@ const NAV = [
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, loading, logout } = useAdminAuth();
+  const { isAdmin, isSuperAdmin, loading, selectedClientId, setSelectedClientId, logout } = useAdminAuth();
   const navigate = useNavigate();
+  const [clients, setClients] = useState([]);
 
   useEffect(() => {
     if (!loading && !isAdmin) navigate('/admin/login');
   }, [isAdmin, loading, navigate]);
 
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    async function loadClients() {
+      const { data } = await supabase.from('clients').select('id, name').order('name');
+      setClients(data || []);
+    }
+    loadClients();
+  }, [isSuperAdmin]);
+
+  // Default to the first client so a super-admin never lands on an empty screen.
+  useEffect(() => {
+    if (isSuperAdmin && !selectedClientId && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [isSuperAdmin, selectedClientId, clients, setSelectedClientId]);
+
   if (loading) return null;
   if (!isAdmin) return null;
+
+  const nav = isSuperAdmin
+    ? [...BASE_NAV, { to: '/admin/clients', label: 'Clients', icon: 'fa-solid fa-building' }]
+    : BASE_NAV;
 
   return (
     <div style={styles.shell} className="admin-shell">
@@ -27,8 +49,22 @@ export default function AdminLayout() {
           <span style={styles.logoText}>Roof<span style={styles.logoU}>U</span></span>
           <span style={styles.adminBadge}>Admin</span>
         </div>
+
+        {isSuperAdmin && (
+          <div style={styles.clientSwitcher}>
+            <div style={styles.clientSwitcherLabel}>Managing</div>
+            <select
+              value={selectedClientId || ''}
+              onChange={e => setSelectedClientId(e.target.value)}
+              style={styles.clientSelect}
+            >
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
+
         <nav style={styles.nav} className="admin-nav">
-          {NAV.map(({ to, label, icon, end }) => (
+          {nav.map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -106,6 +142,28 @@ const styles = {
     padding: '2px 7px',
     borderRadius: '999px',
     letterSpacing: '0.5px',
+  },
+  clientSwitcher: {
+    padding: '0 20px 16px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    marginBottom: '8px',
+  },
+  clientSwitcherLabel: {
+    fontSize: '10px',
+    fontWeight: '700',
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: '6px',
+  },
+  clientSelect: {
+    width: '100%',
+    padding: '7px 8px',
+    fontSize: '13px',
+    borderRadius: '7px',
+    border: '1px solid rgba(255,255,255,0.15)',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--white)',
   },
   nav: {
     flex: 1,
