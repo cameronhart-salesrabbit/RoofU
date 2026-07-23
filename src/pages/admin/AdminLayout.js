@@ -60,7 +60,7 @@ export default function AdminLayout() {
         )}
 
         <nav style={styles.nav} className="admin-nav">
-          {BASE_NAV.map(({ to, label, icon, end }) => (
+          {(isSuperAdmin ? [...BASE_NAV, { to: '/admin/help-center', label: 'Help Center', icon: 'fa-solid fa-circle-question' }] : BASE_NAV).map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}

@@ -70,6 +70,7 @@ export default function LearnerLayout() {
         <nav style={styles.nav}>
           <NavLink to="/" end style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.navLinkActive : {}) })}>My Programs</NavLink>
           <NavLink to="/dashboard" style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.navLinkActive : {}) })}>Progress</NavLink>
+          <NavLink to="/help" style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.navLinkActive : {}) })}>Help</NavLink>
         </nav>
         {!isLessonView && (
           <form onSubmit={e => { e.preventDefault(); if (searchVal.trim()) { navigate(`/search?q=${encodeURIComponent(searchVal.trim())}`); searchRef.current?.blur(); } }} style={{ display: 'flex', alignItems: 'center' }}>

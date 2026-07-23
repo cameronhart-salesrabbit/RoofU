@@ -14,6 +14,7 @@ import CourseBuilder from './pages/admin/CourseBuilder';
 import QuizBuilder from './pages/admin/QuizBuilder';
 import UserManager from './pages/admin/UserManager';
 import ClientsList from './pages/admin/ClientsList';
+import HelpCenterManager from './pages/admin/HelpCenterManager';
 import ProgressReport from './pages/admin/ProgressReport';
 import CompletionReport from './pages/admin/CompletionReport';
 import QuizAnalytics from './pages/admin/QuizAnalytics';
@@ -27,6 +28,8 @@ import LessonView from './pages/learner/LessonView';
 import CourseComplete from './pages/learner/CourseComplete';
 import LearnerDashboard from './pages/learner/LearnerDashboard';
 import SearchResults from './pages/learner/SearchResults';
+import HelpCenter from './pages/learner/HelpCenter';
+import HelpArticle from './pages/learner/HelpArticle';
 import ResetPassword from './pages/learner/ResetPassword';
 
 import './index.css';
@@ -54,6 +57,7 @@ function App() {
             <Route path="quizzes/:quizId" element={<QuizBuilder />} />
             <Route path="users" element={<UserManager />} />
             <Route path="clients" element={<ClientsList />} />
+            <Route path="help-center" element={<HelpCenterManager />} />
           </Route>
 
           {/* Learner routes */}
@@ -65,6 +69,8 @@ function App() {
             <Route path="courses/:courseId" element={<CourseView />} />
             <Route path="lessons/:lessonId" element={<LessonView />} />
             <Route path="courses/:courseId/complete" element={<CourseComplete />} />
+            <Route path="help" element={<HelpCenter />} />
+            <Route path="help/:articleId" element={<HelpArticle />} />
           </Route>
 
           <Route path="reset-password" element={<ResetPassword />} />
