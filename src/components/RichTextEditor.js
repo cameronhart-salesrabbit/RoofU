@@ -128,7 +128,9 @@ const styles = {
   },
   content: {
     padding: '12px 16px',
-    minHeight: 160,
+    minHeight: 440,
+    resize: 'vertical',
+    overflowY: 'auto',
     fontSize: 14,
     lineHeight: 1.6,
     color: 'var(--gray-800)',

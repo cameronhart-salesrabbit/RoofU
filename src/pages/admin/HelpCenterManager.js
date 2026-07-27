@@ -42,12 +42,12 @@ export default function HelpCenterManager() {
     setShowForm(true);
   }
 
-  async function handleSave(e) {
-    e.preventDefault();
+  async function handleSave(publish) {
     setSaving(true);
+    const payload = { ...form, is_published: publish };
     const { error } = editing
-      ? await supabase.from('help_articles').update({ ...form, updated_at: new Date() }).eq('id', editing.id)
-      : await supabase.from('help_articles').insert({ ...form, order: articles.length });
+      ? await supabase.from('help_articles').update({ ...payload, updated_at: new Date() }).eq('id', editing.id)
+      : await supabase.from('help_articles').insert({ ...payload, order: articles.length });
     setSaving(false);
     if (error) {
       console.error('saveHelpArticle failed', error);
@@ -105,7 +105,7 @@ export default function HelpCenterManager() {
         <div style={styles.overlay}>
           <div className="card" style={{ ...styles.modal, maxWidth: 640 }}>
             <h2 style={styles.modalTitle}>{editing ? 'Edit Article' : 'New Article'}</h2>
-            <form onSubmit={handleSave}>
+            <form onSubmit={e => { e.preventDefault(); handleSave(e.nativeEvent.submitter?.value === 'publish'); }}>
               <div className="form-group">
                 <label>Title *</label>
                 <input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. How to reset your password" />
@@ -131,15 +131,10 @@ export default function HelpCenterManager() {
                   clientId="global"
                 />
               </div>
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.is_published} onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))} />
-                  Published (visible to everyone)
-                </label>
-              </div>
               <div style={styles.modalFooter}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save Article'}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)} disabled={saving}>Cancel</button>
+                <button type="submit" value="draft" className="btn btn-secondary" disabled={saving}>{saving ? 'Saving…' : 'Save as Draft'}</button>
+                <button type="submit" value="publish" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Publish'}</button>
               </div>
             </form>
           </div>
