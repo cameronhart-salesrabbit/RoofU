@@ -53,14 +53,16 @@ export default function RichTextEditor({ value, onChange, clientId }) {
       strike: ed.isActive('strike'),
       heading2: ed.isActive('heading', { level: 2 }),
       heading3: ed.isActive('heading', { level: 3 }),
-      alignLeft: ed.isActive({ textAlign: 'left' }),
-      alignCenter: ed.isActive({ textAlign: 'center' }),
-      alignRight: ed.isActive({ textAlign: 'right' }),
+      image: ed.isActive('image'),
+      // Same 3 buttons serve both text and image alignment, depending on
+      // what's currently selected - so "active" needs to check the right one.
+      alignLeft: ed.isActive('image') ? ed.isActive('image', { style: IMAGE_ALIGN_STYLE.left }) : ed.isActive({ textAlign: 'left' }),
+      alignCenter: ed.isActive('image') ? ed.isActive('image', { style: IMAGE_ALIGN_STYLE.center }) : ed.isActive({ textAlign: 'center' }),
+      alignRight: ed.isActive('image') ? ed.isActive('image', { style: IMAGE_ALIGN_STYLE.right }) : ed.isActive({ textAlign: 'right' }),
       bulletList: ed.isActive('bulletList'),
       orderedList: ed.isActive('orderedList'),
       blockquote: ed.isActive('blockquote'),
       codeBlock: ed.isActive('codeBlock'),
-      image: ed.isActive('image'),
     } : null,
   });
 
@@ -94,9 +96,9 @@ export default function RichTextEditor({ value, onChange, clientId }) {
         <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={activeState?.heading2} title="Heading">H2</ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={activeState?.heading3} title="Heading">H3</ToolbarBtn>
         <div style={styles.divider} />
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={activeState?.alignLeft} title="Align left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={activeState?.alignCenter} title="Align center"><i className="fa-solid fa-align-center" /></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={activeState?.alignRight} title="Align right"><i className="fa-solid fa-align-right" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => activeState?.image ? alignImage('left') : editor.chain().focus().setTextAlign('left').run()} active={activeState?.alignLeft} title={activeState?.image ? 'Align image left' : 'Align left'}><i className="fa-solid fa-align-left" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => activeState?.image ? alignImage('center') : editor.chain().focus().setTextAlign('center').run()} active={activeState?.alignCenter} title={activeState?.image ? 'Align image center' : 'Align center'}><i className="fa-solid fa-align-center" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => activeState?.image ? alignImage('right') : editor.chain().focus().setTextAlign('right').run()} active={activeState?.alignRight} title={activeState?.image ? 'Align image right' : 'Align right'}><i className="fa-solid fa-align-right" /></ToolbarBtn>
         <div style={styles.divider} />
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={activeState?.bulletList} title="Bullet list">• List</ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={activeState?.orderedList} title="Numbered list">1. List</ToolbarBtn>
@@ -108,14 +110,6 @@ export default function RichTextEditor({ value, onChange, clientId }) {
           🖼 Image
           <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
         </label>
-        {activeState?.image && (
-          <>
-            <div style={styles.divider} />
-            <ToolbarBtn onClick={() => alignImage('left')} title="Align image left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
-            <ToolbarBtn onClick={() => alignImage('center')} title="Align image center"><i className="fa-solid fa-align-center" /></ToolbarBtn>
-            <ToolbarBtn onClick={() => alignImage('right')} title="Align image right"><i className="fa-solid fa-align-right" /></ToolbarBtn>
-          </>
-        )}
       </div>
       <EditorContent editor={editor} style={styles.content} />
     </div>
