@@ -1,11 +1,32 @@
 import React, { useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
+import BaseImage from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import { supabase } from '../supabase/client';
+
+const IMAGE_ALIGN_STYLE = {
+  left: 'display: block; max-width: 100%; margin: 0 auto 0 0;',
+  center: 'display: block; max-width: 100%; margin: 0 auto;',
+  right: 'display: block; max-width: 100%; margin: 0 0 0 auto;',
+};
+
+// Extends the base Image node with a `style` attribute so images can be
+// left/center/right aligned (plain Image nodes have no alignment concept).
+const Image = BaseImage.extend({
+  addAttributes() {
+    return {
+      ...this.parent(),
+      style: {
+        default: IMAGE_ALIGN_STYLE.center,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => (attributes.style ? { style: attributes.style } : {}),
+      },
+    };
+  },
+});
 
 export default function RichTextEditor({ value, onChange, clientId }) {
   const editor = useEditor({
@@ -31,9 +52,13 @@ export default function RichTextEditor({ value, onChange, clientId }) {
     if (error) { alert('Image upload failed: ' + error.message); return; }
 
     const { data } = supabase.storage.from('lesson-content').getPublicUrl(path);
-    editor.chain().focus().setImage({ src: data.publicUrl }).run();
+    editor.chain().focus().setImage({ src: data.publicUrl, style: IMAGE_ALIGN_STYLE.center }).run();
     e.target.value = '';
   }, [editor, clientId]);
+
+  const alignImage = useCallback((align) => {
+    editor.chain().focus().updateAttributes('image', { style: IMAGE_ALIGN_STYLE[align] }).run();
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -60,6 +85,14 @@ export default function RichTextEditor({ value, onChange, clientId }) {
           🖼 Image
           <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
         </label>
+        {editor.isActive('image') && (
+          <>
+            <div style={styles.divider} />
+            <ToolbarBtn onClick={() => alignImage('left')} title="Align image left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
+            <ToolbarBtn onClick={() => alignImage('center')} title="Align image center"><i className="fa-solid fa-align-center" /></ToolbarBtn>
+            <ToolbarBtn onClick={() => alignImage('right')} title="Align image right"><i className="fa-solid fa-align-right" /></ToolbarBtn>
+          </>
+        )}
       </div>
       <EditorContent editor={editor} style={styles.content} />
     </div>
