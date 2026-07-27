@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import BaseImage from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -41,6 +41,29 @@ export default function RichTextEditor({ value, onChange, clientId }) {
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
 
+  // useEditor() alone doesn't re-render this component on selection-only
+  // changes (e.g. clicking an image, moving the cursor) - only on content
+  // changes via onUpdate. Without this, "active" toolbar states and the
+  // image-alignment buttons would silently go stale until the next edit.
+  const activeState = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => ed ? {
+      bold: ed.isActive('bold'),
+      italic: ed.isActive('italic'),
+      strike: ed.isActive('strike'),
+      heading2: ed.isActive('heading', { level: 2 }),
+      heading3: ed.isActive('heading', { level: 3 }),
+      alignLeft: ed.isActive({ textAlign: 'left' }),
+      alignCenter: ed.isActive({ textAlign: 'center' }),
+      alignRight: ed.isActive({ textAlign: 'right' }),
+      bulletList: ed.isActive('bulletList'),
+      orderedList: ed.isActive('orderedList'),
+      blockquote: ed.isActive('blockquote'),
+      codeBlock: ed.isActive('codeBlock'),
+      image: ed.isActive('image'),
+    } : null,
+  });
+
   const handleImageUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file || !editor) return;
@@ -65,27 +88,27 @@ export default function RichTextEditor({ value, onChange, clientId }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.toolbar}>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold">B</ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><em>I</em></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><s>S</s></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading">H2</ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading">H3</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={activeState?.bold} title="Bold">B</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={activeState?.italic} title="Italic"><em>I</em></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={activeState?.strike} title="Strikethrough"><s>S</s></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={activeState?.heading2} title="Heading">H2</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={activeState?.heading3} title="Heading">H3</ToolbarBtn>
         <div style={styles.divider} />
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Align center"><i className="fa-solid fa-align-center" /></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Align right"><i className="fa-solid fa-align-right" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={activeState?.alignLeft} title="Align left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={activeState?.alignCenter} title="Align center"><i className="fa-solid fa-align-center" /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={activeState?.alignRight} title="Align right"><i className="fa-solid fa-align-right" /></ToolbarBtn>
         <div style={styles.divider} />
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet list">• List</ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered list">1. List</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={activeState?.bulletList} title="Bullet list">• List</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={activeState?.orderedList} title="Numbered list">1. List</ToolbarBtn>
         <div style={styles.divider} />
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">"</ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code block">{`</>`}</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={activeState?.blockquote} title="Blockquote">"</ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={activeState?.codeBlock} title="Code block">{`</>`}</ToolbarBtn>
         <div style={styles.divider} />
         <label style={styles.imgBtn} title="Upload image">
           🖼 Image
           <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
         </label>
-        {editor.isActive('image') && (
+        {activeState?.image && (
           <>
             <div style={styles.divider} />
             <ToolbarBtn onClick={() => alignImage('left')} title="Align image left"><i className="fa-solid fa-align-left" /></ToolbarBtn>
