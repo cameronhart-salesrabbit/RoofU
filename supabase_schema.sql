@@ -146,3 +146,16 @@ create table quiz_results (
   completed_at timestamptz default now(),
   client_id uuid not null references clients(id)
 );
+
+-- Help Center articles — global, NOT client-scoped (see migrations/004_help_center.sql).
+-- RLS: any authenticated user reads published rows; only super_admin can write.
+create table help_articles (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  category text not null default 'General',
+  content text,
+  is_published boolean not null default true,
+  "order" integer default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
