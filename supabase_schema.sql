@@ -159,3 +159,12 @@ create table help_articles (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Managed category names for help_articles (see migrations/005_help_categories.sql).
+-- RLS: super_admin only, both read and write. help_articles.category stays a
+-- plain text column — this table just powers the admin dropdown.
+create table help_categories (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null unique,
+  created_at timestamptz default now()
+);

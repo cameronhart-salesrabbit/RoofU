@@ -9,16 +9,21 @@ const emptyForm = { title: '', category: '', content: '', is_published: true };
 export default function HelpCenterManager() {
   const { isSuperAdmin } = useAdminAuth();
   const [articles, setArticles] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [renamingId, setRenamingId] = useState(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
     fetchArticles();
+    fetchCategories();
   }, [isSuperAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchArticles() {
@@ -28,11 +33,14 @@ export default function HelpCenterManager() {
     setLoading(false);
   }
 
-  const categorySuggestions = [...new Set(articles.map(a => a.category).filter(Boolean))];
+  async function fetchCategories() {
+    const { data } = await supabase.from('help_categories').select('*').order('name');
+    setCategories(data || []);
+  }
 
   function openNew() {
     setEditing(null);
-    setForm({ ...emptyForm, category: categorySuggestions[0] || 'General' });
+    setForm({ ...emptyForm, category: categories[0]?.name || '' });
     setShowForm(true);
   }
 
@@ -74,6 +82,50 @@ export default function HelpCenterManager() {
     fetchArticles();
   }
 
+  async function addCategory() {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      alert('That category already exists.');
+      return;
+    }
+    const { error } = await supabase.from('help_categories').insert({ name });
+    if (error) {
+      console.error('addHelpCategory failed', error);
+      alert(`Couldn't add category: ${error.message}`);
+      return;
+    }
+    setNewCategoryName('');
+    fetchCategories();
+  }
+
+  async function renameCategory(category, newName) {
+    const trimmed = newName.trim();
+    setRenamingId(null);
+    if (!trimmed || trimmed === category.name) return;
+    const { error } = await supabase.from('help_categories').update({ name: trimmed }).eq('id', category.id);
+    if (error) {
+      console.error('renameHelpCategory failed', error);
+      alert(`Couldn't rename category: ${error.message}`);
+      return;
+    }
+    // Keep existing articles grouped correctly under the renamed category.
+    await supabase.from('help_articles').update({ category: trimmed }).eq('category', category.name);
+    fetchCategories();
+    fetchArticles();
+  }
+
+  async function deleteCategory(category) {
+    if (!window.confirm(`Delete category "${category.name}"? Existing articles keep this category name, but it won't appear in the dropdown for new or edited articles.`)) return;
+    const { error } = await supabase.from('help_categories').delete().eq('id', category.id);
+    if (error) {
+      console.error('deleteHelpCategory failed', error);
+      alert(`Couldn't delete category: ${error.message}`);
+      return;
+    }
+    fetchCategories();
+  }
+
   if (!isSuperAdmin) return <Navigate to="/admin/analytics/dashboard" replace />;
   if (loading) return <p style={{ color: 'var(--gray-400)' }}>Loading…</p>;
 
@@ -94,12 +146,57 @@ export default function HelpCenterManager() {
             onChange={e => setSearch(e.target.value)}
             style={styles.searchInput}
           />
+          <button className="btn btn-secondary" onClick={() => setShowCategoryManager(true)}>Manage Categories</button>
           <button className="btn btn-primary" onClick={openNew}>+ New Article</button>
         </div>
       </div>
       <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: -12, marginBottom: 20 }}>
         This content is global — visible to every client, not just one. Only super_admins can edit it.
       </p>
+
+      {showCategoryManager && (
+        <div style={styles.overlay}>
+          <div className="card" style={{ ...styles.modal, maxWidth: 440 }}>
+            <h2 style={styles.modalTitle}>Manage Categories</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }}
+                placeholder="New category name"
+                style={{ flex: 1 }}
+              />
+              <button type="button" className="btn btn-primary" onClick={addCategory}>+ Add</button>
+            </div>
+            {categories.length === 0 ? (
+              <p style={{ color: 'var(--gray-500)', fontSize: 13 }}>No categories yet — until you add one, new articles use a free-text category field.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {categories.map(c => (
+                  <div key={c.id} style={styles.categoryRow}>
+                    {renamingId === c.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={c.name}
+                        onBlur={e => renameCategory(c, e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setRenamingId(null); }}
+                        style={{ flex: 1 }}
+                      />
+                    ) : (
+                      <span style={{ flex: 1, fontSize: 14 }}>{c.name}</span>
+                    )}
+                    <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setRenamingId(c.id)}>Rename</button>
+                    <button type="button" className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => deleteCategory(c)}>Delete</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={styles.modalFooter}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCategoryManager(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div style={styles.overlay}>
@@ -112,16 +209,26 @@ export default function HelpCenterManager() {
               </div>
               <div className="form-group">
                 <label>Category *</label>
-                <input
-                  required
-                  list="help-category-suggestions"
-                  value={form.category}
-                  onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                  placeholder="e.g. Getting Started"
-                />
-                <datalist id="help-category-suggestions">
-                  {categorySuggestions.map(c => <option key={c} value={c} />)}
-                </datalist>
+                {categories.length > 0 ? (
+                  <select
+                    required
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  >
+                    <option value="" disabled>Select a category…</option>
+                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {form.category && !categories.some(c => c.name === form.category) && (
+                      <option value={form.category}>{form.category} (legacy)</option>
+                    )}
+                  </select>
+                ) : (
+                  <input
+                    required
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    placeholder="e.g. Getting Started"
+                  />
+                )}
               </div>
               <div className="form-group">
                 <label>Content</label>
@@ -190,6 +297,7 @@ const styles = {
   modal: { width: '100%', maxWidth: 540, padding: 28, maxHeight: '90vh', overflowY: 'auto' },
   modalTitle: { fontSize: 18, fontWeight: 700, marginBottom: 20 },
   modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
+  categoryRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { padding: '10px 16px', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', textAlign: 'left', borderBottom: '1px solid var(--gray-200)', background: 'var(--gray-50)' },
   tr: { borderBottom: '1px solid var(--gray-100)' },
