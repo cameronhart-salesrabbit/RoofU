@@ -19,6 +19,7 @@ export default function HelpCenterManager() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [renamingId, setRenamingId] = useState(null);
+  const [addingCategory, setAddingCategory] = useState(false);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -40,19 +41,34 @@ export default function HelpCenterManager() {
 
   function openNew() {
     setEditing(null);
-    setForm({ ...emptyForm, category: categories[0]?.name || '' });
+    const hasCategories = categories.length > 0;
+    setAddingCategory(!hasCategories);
+    setForm({ ...emptyForm, category: hasCategories ? categories[0].name : '' });
     setShowForm(true);
   }
 
   function openEdit(article) {
     setEditing(article);
+    setAddingCategory(false);
     setForm({ title: article.title, category: article.category, content: article.content || '', is_published: article.is_published });
     setShowForm(true);
   }
 
   async function handleSave(publish) {
+    const categoryName = form.category.trim();
     setSaving(true);
-    const payload = { ...form, is_published: publish };
+
+    if (!categories.some(c => c.name.toLowerCase() === categoryName.toLowerCase())) {
+      const { error: categoryError } = await supabase.from('help_categories').insert({ name: categoryName });
+      if (categoryError) {
+        console.error('addHelpCategory failed', categoryError);
+        alert(`Couldn't save new category: ${categoryError.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    const payload = { ...form, category: categoryName, is_published: publish };
     const { error } = editing
       ? await supabase.from('help_articles').update({ ...payload, updated_at: new Date() }).eq('id', editing.id)
       : await supabase.from('help_articles').insert({ ...payload, order: articles.length });
@@ -63,6 +79,7 @@ export default function HelpCenterManager() {
       return;
     }
     setShowForm(false);
+    fetchCategories();
     fetchArticles();
   }
 
@@ -209,25 +226,46 @@ export default function HelpCenterManager() {
               </div>
               <div className="form-group">
                 <label>Category *</label>
-                {categories.length > 0 ? (
+                {categories.length > 0 && !addingCategory ? (
                   <select
                     required
                     value={form.category}
-                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    onChange={e => {
+                      if (e.target.value === '__new__') {
+                        setAddingCategory(true);
+                        setForm(f => ({ ...f, category: '' }));
+                      } else {
+                        setForm(f => ({ ...f, category: e.target.value }));
+                      }
+                    }}
                   >
                     <option value="" disabled>Select a category…</option>
                     {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     {form.category && !categories.some(c => c.name === form.category) && (
                       <option value={form.category}>{form.category} (legacy)</option>
                     )}
+                    <option value="__new__">+ Add new category…</option>
                   </select>
                 ) : (
-                  <input
-                    required
-                    value={form.category}
-                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                    placeholder="e.g. Getting Started"
-                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      required
+                      autoFocus={addingCategory}
+                      value={form.category}
+                      onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                      placeholder="e.g. Getting Started"
+                      style={{ flex: 1 }}
+                    />
+                    {categories.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => { setAddingCategory(false); setForm(f => ({ ...f, category: categories[0].name })); }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="form-group">
