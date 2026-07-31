@@ -34,7 +34,8 @@ export default function CourseBuilder() {
     const { data: c } = await supabase.from('courses').select('*').eq('id', courseId).single();
     setCourse(c || null);
     const { data: secs } = await supabase.from('sections').select('*, lessons(*)').eq('course_id', courseId).order('order');
-    setSections(secs || []);
+    const sortedSecs = (secs || []).map(s => ({ ...s, lessons: (s.lessons || []).sort((a, b) => a.order - b.order) }));
+    setSections(sortedSecs);
     setLoading(false);
   }, [courseId]);
 
