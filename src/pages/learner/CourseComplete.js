@@ -8,6 +8,7 @@ export default function CourseComplete() {
   const navigate = useNavigate();
   const { learnerId } = useProgress();
   const [course, setCourse] = useState(null);
+  const [nextCourse, setNextCourse] = useState(null);
   const [quizStats, setQuizStats] = useState({ taken: 0, passed: 0, avgScore: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -15,6 +16,7 @@ export default function CourseComplete() {
     async function load() {
       const { data: c } = await supabase.from('courses').select('*').eq('id', courseId).single();
       setCourse(c);
+      setNextCourse(null);
 
       if (learnerId) {
         const { data: results } = await supabase
@@ -26,6 +28,24 @@ export default function CourseComplete() {
           const passed = results.filter(r => r.passed).length;
           const avg = Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length);
           setQuizStats({ taken: results.length, passed, avgScore: avg });
+        }
+
+        // Find the next course after this one in any program the learner is
+        // enrolled in, using that program's course order (see ProgramManager's
+        // drag-and-drop course reordering).
+        const { data: enrollments } = await supabase.from('user_program_enrollments').select('program_id').eq('user_id', learnerId);
+        const programIds = (enrollments || []).map(e => e.program_id);
+        if (programIds.length > 0) {
+          const { data: pc } = await supabase.from('program_courses').select('program_id, course_id, order').in('program_id', programIds).order('order');
+          const byProgram = {};
+          (pc || []).forEach(row => { (byProgram[row.program_id] ||= []).push(row); });
+          for (const rows of Object.values(byProgram)) {
+            const idx = rows.findIndex(r => r.course_id === courseId);
+            if (idx >= 0 && idx < rows.length - 1) {
+              const { data: nc } = await supabase.from('courses').select('id, title').eq('id', rows[idx + 1].course_id).single();
+              if (nc) { setNextCourse(nc); break; }
+            }
+          }
         }
       }
 
@@ -64,7 +84,16 @@ export default function CourseComplete() {
         )}
 
         <div style={styles.actions}>
-          <button className="btn btn-primary" onClick={() => navigate('/')}>Back to My Programs</button>
+          {nextCourse ? (
+            <>
+              <button className="btn btn-primary" onClick={() => navigate(`/courses/${nextCourse.id}`)}>
+                Continue to {nextCourse.title} <i className="fa-solid fa-arrow-right" />
+              </button>
+              <button className="btn btn-secondary" onClick={() => navigate('/')}>Back to My Programs</button>
+            </>
+          ) : (
+            <button className="btn btn-primary" onClick={() => navigate('/')}>Back to My Programs</button>
+          )}
           <button className="btn btn-secondary" onClick={() => navigate(`/courses/${courseId}`)}>Review Course</button>
         </div>
       </div>

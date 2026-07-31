@@ -105,7 +105,16 @@ export default function LessonView() {
     await markLessonComplete(course.id, lesson.id);
     setMarking(false);
 
-    // Check if this was the last lesson
+    const idx = allLessons.findIndex(l => l.id === lesson.id);
+    const next = idx >= 0 && idx < allLessons.length - 1 ? allLessons[idx + 1] : null;
+    if (next) {
+      navigate(`/lessons/${next.id}`);
+      return;
+    }
+
+    // No next lesson — only treat the course as complete once every lesson
+    // (not just this one) is actually marked done, in case they jumped
+    // ahead via the sidebar and skipped earlier lessons.
     const completedAfter = allLessons.filter(l =>
       l.id === lesson.id || (progress[course.id]?.completed_lesson_ids || []).includes(l.id)
     ).length;
