@@ -213,6 +213,7 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh,
   const [lessonForm, setLessonForm] = useState({ title: '', video_type: 'youtube', video_url: '', written_content: '', duration_minutes: '', attachment_url: '', attachment_name: '' });
   const [saving, setSaving] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
   const dragStyle = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -288,6 +289,22 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh,
     setUploadingPdf(false);
   }
 
+  async function handleVideoUpload(e) {
+    const file = e.target.files[0];
+    if (!file || file.type !== 'video/mp4') return;
+    setUploadingVideo(true);
+    const path = `${clientId}/videos/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { error } = await supabase.storage.from('lesson-content').upload(path, file);
+    if (error) {
+      console.error('Video upload failed', error);
+      alert(`Couldn't upload video: ${error.message}`);
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('lesson-content').getPublicUrl(path);
+      setLessonForm(f => ({ ...f, video_url: publicUrl }));
+    }
+    setUploadingVideo(false);
+  }
+
   return (
     <div ref={setNodeRef} style={{ ...dragStyle, marginBottom: 12 }} className="card">
       <div style={sStyles.sectionHeader} onClick={onToggle}>
@@ -348,6 +365,12 @@ function SectionCard({ section, expanded, onToggle, onEdit, onDelete, onRefresh,
               <div className="form-group">
                 <label>{lessonForm.video_type === 'youtube' ? 'YouTube URL' : 'MP4 File URL'}</label>
                 <input value={lessonForm.video_url} onChange={e => setLessonForm(f => ({ ...f, video_url: e.target.value }))} placeholder={lessonForm.video_type === 'youtube' ? 'https://www.youtube.com/watch?v=...' : 'https://...'} />
+                {lessonForm.video_type === 'mp4' && (
+                  <div style={{ marginTop: 8 }}>
+                    <input type="file" accept="video/mp4" onChange={handleVideoUpload} disabled={uploadingVideo} style={{ fontSize: 13 }} />
+                    {uploadingVideo && <p style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>Uploading…</p>}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>Duration (minutes)</label>
