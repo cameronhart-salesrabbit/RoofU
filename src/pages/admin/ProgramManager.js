@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabase/client';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export default function ProgramManager() {
   const { effectiveClientId } = useAdminAuth();
@@ -75,13 +89,24 @@ export default function ProgramManager() {
     fetchAll();
   }
 
-  function toggleCourse(id) {
-    setForm(f => ({
-      ...f,
-      courseIds: f.courseIds.includes(id)
-        ? f.courseIds.filter(c => c !== id)
-        : [...f.courseIds, id],
-    }));
+  function addCourse(id) {
+    setForm(f => ({ ...f, courseIds: [...f.courseIds, id] }));
+  }
+
+  function removeCourse(id) {
+    setForm(f => ({ ...f, courseIds: f.courseIds.filter(c => c !== id) }));
+  }
+
+  const courseSensors = useSensors(useSensor(PointerSensor));
+
+  function handleCourseDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setForm(f => {
+      const oldIndex = f.courseIds.indexOf(active.id);
+      const newIndex = f.courseIds.indexOf(over.id);
+      return { ...f, courseIds: arrayMove(f.courseIds, oldIndex, newIndex) };
+    });
   }
 
   const filteredPrograms = programs.filter(p =>
@@ -120,10 +145,29 @@ export default function ProgramManager() {
               </div>
               <div className="form-group">
                 <label>Courses in this Program {form.courseIds.length > 0 && <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>({form.courseIds.length} selected)</span>}</label>
+
+                {form.courseIds.length > 0 && (() => {
+                  const selectedCourses = form.courseIds.map(id => courses.find(c => c.id === id)).filter(Boolean);
+                  return (
+                    <>
+                      <p style={{ fontSize: 12, color: 'var(--gray-400)', marginBottom: 6 }}>Drag to reorder — this is the order learners will see.</p>
+                      <DndContext sensors={courseSensors} collisionDetection={closestCenter} onDragEnd={handleCourseDragEnd}>
+                        <SortableContext items={form.courseIds} strategy={verticalListSortingStrategy}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                            {selectedCourses.map(c => (
+                              <SortableCourseRow key={c.id} id={c.id} title={c.title} onRemove={() => removeCourse(c.id)} />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    </>
+                  );
+                })()}
+
                 {courses.length > 0 && (
                   <input
                     type="search"
-                    placeholder="Search courses…"
+                    placeholder="Search courses to add…"
                     value={courseSearch}
                     onChange={e => setCourseSearch(e.target.value)}
                     style={styles.courseSearchInput}
@@ -133,14 +177,14 @@ export default function ProgramManager() {
                   {courses.length === 0 ? (
                     <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses yet — create some first.</p>
                   ) : (() => {
-                    const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(courseSearch.toLowerCase()));
-                    return filteredCourses.length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>No courses match "{courseSearch}".</p>
-                    ) : filteredCourses.map(c => (
-                      <label key={c.id} style={styles.checkItem}>
-                        <input type="checkbox" checked={form.courseIds.includes(c.id)} onChange={() => toggleCourse(c.id)} />
+                    const availableCourses = courses.filter(c => !form.courseIds.includes(c.id) && c.title.toLowerCase().includes(courseSearch.toLowerCase()));
+                    return availableCourses.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--gray-400)' }}>{courseSearch ? `No courses match "${courseSearch}".` : 'All courses have been added.'}</p>
+                    ) : availableCourses.map(c => (
+                      <div key={c.id} style={styles.checkItem} onClick={() => addCourse(c.id)}>
+                        <i className="fa-solid fa-plus" style={{ color: 'var(--gray-400)', fontSize: 12 }} />
                         {c.title}
-                      </label>
+                      </div>
                     ));
                   })()}
                 </div>
@@ -185,6 +229,18 @@ export default function ProgramManager() {
   );
 }
 
+function SortableCourseRow({ id, title, onRemove }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={{ ...style, ...styles.selectedRow }}>
+      <span {...attributes} {...listeners} style={styles.dragHandle} title="Drag to reorder">⠿</span>
+      <span style={{ flex: 1, fontSize: 14 }}>{title}</span>
+      <button type="button" className="btn btn-secondary" style={{ padding: '2px 10px', fontSize: 12 }} onClick={onRemove}>Remove</button>
+    </div>
+  );
+}
+
 const styles = {
   searchInput: { padding: '8px 12px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', width: 220 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 },
@@ -194,6 +250,8 @@ const styles = {
   courseSearchInput: { width: '100%', padding: '7px 10px', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', fontSize: 13, outline: 'none', marginBottom: 8, boxSizing: 'border-box' },
   checkList: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', padding: 4 },
   checkItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
+  selectedRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', background: '#fff' },
+  dragHandle: { cursor: 'grab', fontSize: 16, color: 'var(--gray-300)', padding: '0 2px', userSelect: 'none' },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', gap: 16 },
   rowInfo: { flex: 1 },
