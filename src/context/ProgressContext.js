@@ -1,14 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase/client';
+import { useAdminAuth } from './AdminAuthContext';
 
 const ProgressContext = createContext(null);
 
 export function ProgressProvider({ children }) {
+  const { impersonatedUser } = useAdminAuth();
   const [learnerId, setLearnerId] = useState(null);
   const [progress, setProgress] = useState({});
 
-  // Reactively track the logged-in learner's users.id (not auth.users.id)
+  // Reactively track the logged-in learner's users.id (not auth.users.id) —
+  // or, when a super_admin is impersonating someone, that user's id instead.
   useEffect(() => {
+    setProgress({});
+
+    if (impersonatedUser) {
+      setLearnerId(impersonatedUser.id);
+      return;
+    }
+
     async function resolveId(authUserId) {
       if (!authUserId) { setLearnerId(null); return; }
       const { data } = await supabase
@@ -36,7 +46,7 @@ export function ProgressProvider({ children }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [impersonatedUser]);
 
   const fetchProgress = useCallback(async (courseId) => {
     if (!learnerId) return null;

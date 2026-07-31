@@ -11,7 +11,7 @@ const BASE_NAV = [
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, isSuperAdmin, loading, selectedClientId, setSelectedClientId, logout } = useAdminAuth();
+  const { isAdmin, isSuperAdmin, loading, selectedClientId, setSelectedClientId, stopImpersonation, logout } = useAdminAuth();
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
 
@@ -76,7 +76,7 @@ export default function AdminLayout() {
           ))}
         </nav>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => { stopImpersonation(); navigate('/'); }}
           style={{ ...styles.logoutBtn, marginBottom: 8, color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }}
         >
           <i className="fa-solid fa-graduation-cap" style={{ marginRight: 8, fontSize: 12 }} />

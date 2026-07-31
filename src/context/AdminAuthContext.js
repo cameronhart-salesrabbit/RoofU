@@ -12,6 +12,8 @@ export function AdminAuthProvider({ children }) {
   const [clientId, setClientId] = useState(null);
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [impersonatedUser, setImpersonatedUser] = useState(null);
+  const [impersonatedClientName, setImpersonatedClientName] = useState('');
 
   useEffect(() => {
     async function checkRole(authUserId) {
@@ -62,6 +64,23 @@ export function AdminAuthProvider({ children }) {
     setRole(null);
     setClientId(null);
     setSelectedClientId(null);
+    setImpersonatedUser(null);
+    setImpersonatedClientName('');
+  };
+
+  // Lets a super-admin view the Learner portal as a specific user from any
+  // client, without their password — the real Supabase Auth session stays
+  // the super-admin's own, RLS already grants super_admin full read/write
+  // access across clients, so this just swaps which `users` row the learner
+  // pages resolve as "me" (see LearnerLayout.js / ProgressContext.js).
+  const startImpersonation = (user, clientName) => {
+    setImpersonatedUser(user);
+    setImpersonatedClientName(clientName || '');
+  };
+
+  const stopImpersonation = () => {
+    setImpersonatedUser(null);
+    setImpersonatedClientName('');
   };
 
   // A super-admin manages whichever client they've picked in the client
@@ -73,6 +92,7 @@ export function AdminAuthProvider({ children }) {
     <AdminAuthContext.Provider value={{
       isAdmin, isSuperAdmin, role, clientId,
       selectedClientId, setSelectedClientId, effectiveClientId,
+      impersonatedUser, impersonatedClientName, startImpersonation, stopImpersonation,
       loading, login, logout,
     }}>
       {children}

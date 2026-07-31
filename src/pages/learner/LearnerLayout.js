@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import LearnerLogin from './LearnerLogin';
 
 export default function LearnerLayout() {
-  const [user, setUser] = useState(null);         // row from users table
+  const { impersonatedUser, impersonatedClientName, stopImpersonation } = useAdminAuth();
+  const [realUser, setRealUser] = useState(null);  // row from users table, for the actual logged-in session
   const [authLoading, setAuthLoading] = useState(true);
+  const user = impersonatedUser || realUser;       // what's shown/used everywhere below
   const [searchVal, setSearchVal] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,7 +17,7 @@ export default function LearnerLayout() {
 
   useEffect(() => {
     async function loadProfile(authUserId) {
-      if (!authUserId) { setUser(null); setAuthLoading(false); return; }
+      if (!authUserId) { setRealUser(null); setAuthLoading(false); return; }
       try {
         let { data, error } = await supabase.from('users').select('*').eq('auth_id', authUserId).single();
         if (!data) {
@@ -28,10 +31,10 @@ export default function LearnerLayout() {
         } else if (error && error.code !== 'PGRST116') {
           console.error('Profile load error:', error);
         }
-        setUser(data || null);
+        setRealUser(data || null);
       } catch (e) {
         console.error('Profile load exception:', e);
-        setUser(null);
+        setRealUser(null);
       }
       setAuthLoading(false);
     }
@@ -49,8 +52,14 @@ export default function LearnerLayout() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    setUser(null);
+    setRealUser(null);
+    stopImpersonation();
     navigate('/');
+  }
+
+  function handleExitImpersonation() {
+    stopImpersonation();
+    navigate('/admin/users');
   }
 
   if (authLoading) {
@@ -65,6 +74,15 @@ export default function LearnerLayout() {
 
   return (
     <div style={styles.shell}>
+      {impersonatedUser && (
+        <div style={styles.impersonationBanner}>
+          <span>
+            <i className="fa-solid fa-user-secret" style={{ marginRight: 8 }} />
+            Viewing as <strong>{impersonatedUser.name}</strong> ({impersonatedUser.email}){impersonatedClientName ? ` — ${impersonatedClientName}` : ''}
+          </span>
+          <button onClick={handleExitImpersonation} style={styles.exitImpersonationBtn}>Exit Impersonation</button>
+        </div>
+      )}
       <header style={styles.header} className="learner-header">
         <Link to="/" style={styles.logo}>ROOFU</Link>
         <nav style={styles.nav}>
@@ -90,7 +108,7 @@ export default function LearnerLayout() {
         <div style={styles.userArea}>
           <span style={styles.userName}>{user.name}</span>
           {(user.role === 'admin' || user.role === 'super_admin') && (
-            <button onClick={() => navigate('/admin')} style={styles.adminSwitchBtn}>
+            <button onClick={() => { if (impersonatedUser) stopImpersonation(); navigate('/admin'); }} style={styles.adminSwitchBtn}>
               <i className="fa-solid fa-shield-halved" style={{ marginRight: 6, fontSize: 11 }} />
               Admin Portal
             </button>
@@ -107,6 +125,8 @@ export default function LearnerLayout() {
 
 const styles = {
   shell: { minHeight: '100vh', display: 'flex', flexDirection: 'column' },
+  impersonationBanner: { background: 'var(--red)', color: '#fff', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '8px 16px', flexWrap: 'wrap', textAlign: 'center' },
+  exitImpersonationBtn: { background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#fff', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   header: {
     height: 56,
     background: 'var(--pitch)',

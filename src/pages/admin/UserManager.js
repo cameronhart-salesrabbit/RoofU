@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
@@ -39,7 +40,8 @@ function parseCsv(text) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function UserManager() {
-  const { effectiveClientId } = useAdminAuth();
+  const { effectiveClientId, startImpersonation } = useAdminAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [clientName, setClientName] = useState('');
@@ -277,6 +279,11 @@ export default function UserManager() {
     fetchAll();
   }
 
+  function handleImpersonate(user) {
+    startImpersonation(user, clientName);
+    navigate('/');
+  }
+
   function toggleProgram(id) {
     setForm(f => ({
       ...f,
@@ -494,6 +501,9 @@ export default function UserManager() {
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleImpersonate(user)} title="View the Learner portal as this user">
+                              <i className="fa-solid fa-user-secret" /> Impersonate
+                            </button>
                             <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => openEdit(user)}>Edit</button>
                             <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleDelete(user.id)}>Delete</button>
                           </div>
